@@ -1,0 +1,8 @@
+.sites-runtime/
+node_modules/
+.DS_Store
+.env
+results/*
+!results/.gitkeep
+.capture-temp/
+__pycache__/

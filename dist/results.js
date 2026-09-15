@@ -1,0 +1,50 @@
+const $=id=>document.getElementById(id);
+let current=null, available=false, busy=false, loadToken=0;
+async function api(url,options) {const response=await fetch(url,options);const data=await response.json();if(!response.ok)throw new Error(data.error||'Request failed');return data;}
+function stat(label,value) {const row=document.createElement('div'),name=document.createElement('span'),number=document.createElement('strong');name.textContent=label;number.textContent=value;row.append(name,number);$('result-stats').append(row);}
+const percent=n=>`${Math.round((n??0)*100)}%`;
+function range(value){return value?`${Math.round(value.min)}–${Math.round(value.max)}°`:'Unavailable';}
+async function show(id) {
+  const token=++loadToken; current=null; $('generate-advice').disabled=true;
+  try {
+    const record=await api('/api/results/'+encodeURIComponent(id)); if(token!==loadToken)return;
+    current=record; history.replaceState(null,'','results.html?id='+id);
+    $('empty-library').hidden=true; $('result-video').hidden=false;
+    $('result-video').src=`/results/${id}/${record.processed}`;
+    $('original-link').href=`/results/${id}/${record.original}`; $('original-link').hidden=false;
+    $('json-link').href=`/results/${id}/data.json`; $('json-link').download=`throw-${id}.json`;
+    $('trajectory').hidden=false; $('result-stats').replaceChildren();
+    const m=record.metrics;
+    stat('Duration',`${m.duration_s.toFixed(1)} s`);stat('Processed FPS',m.processed_fps?.toFixed(1)??'—');stat('Ball visible',percent(m.ball_detection_fraction));stat('Body detected',percent(m.pose_detection_fraction));
+    stat('Hands detected',percent(m.hand_detection_fraction));
+    stat('Left elbow · 2D',range(m.projected_angles_deg?.left_elbow_deg));stat('Right elbow · 2D',range(m.projected_angles_deg?.right_elbow_deg));
+    const canvas=$('path-chart'),ctx=canvas.getContext('2d'),dim=record.report.coordinate_system;
+    ctx.clearRect(0,0,canvas.width,canvas.height);ctx.strokeStyle='#c5f36b';ctx.lineWidth=2;
+    const scale=Math.min((canvas.width-20)/dim.width,(canvas.height-20)/dim.height),ox=(canvas.width-dim.width*scale)/2,oy=(canvas.height-dim.height*scale)/2;
+    let previous=null;
+    for(const s of record.report.samples){if(!s.ball){previous=null;continue;}const x=ox+s.ball.x_px*scale,y=oy+s.ball.y_px*scale;ctx.beginPath();if(previous&&s.t_s-previous.t<.12){ctx.moveTo(previous.x,previous.y);ctx.lineTo(x,y);ctx.stroke();}else{ctx.fillStyle='#c5f36b';ctx.arc(x,y,2,0,2*Math.PI);ctx.fill();}previous={x,y,t:s.t_s};}
+    $('advice').textContent=record.advice?.text || (available?'Ready to review this recording.':'LLM not connected. Add a GEMINI_API_KEY or OPENAI_API_KEY to .env and restart the server.');
+    $('generate-advice').disabled=!available||!!record.advice; $('generate-advice').textContent=record.advice?'Advice saved':'Get coaching advice';
+  }catch(e){if(token!==loadToken)return;$('library-message').textContent=e.message;$('empty-library').hidden=false;$('result-video').hidden=true;$('advice').textContent=e.message;}
+}
+$('recording-list').onchange=()=>show($('recording-list').value);
+$('generate-advice').onclick=async()=>{
+  if(!current||busy||!available)return;
+  const id=current.id;busy=true;$('generate-advice').disabled=true;$('advice').textContent='Reviewing the measured movement…';
+  try{const advice=await api(`/api/results/${id}/advice`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});if(current?.id===id){current.advice=advice;$('advice').textContent=advice.text;$('generate-advice').textContent='Advice saved';}}
+  catch(e){if(current?.id===id)$('advice').textContent=e.message;}
+  finally{busy=false;$('generate-advice').disabled=!available||!current||!!current.advice;}
+};
+async function init(){
+  try{
+    const [config,list]=await Promise.all([api('/api/config'),api('/api/results')]);available=config.llm_configured;
+    $('llm-status').textContent=available?`Get coaching advice sends derived stats and sampled landmarks to ${config.provider}. Videos stay local.`:'LLM not connected. Configure GEMINI_API_KEY or OPENAI_API_KEY in .env and restart the local server.';
+    if(!list.results.length){$('library-message').textContent='Recordings will appear here after you press Stop.';return;}
+    $('recording-list').replaceChildren();
+    for(const record of list.results){const option=document.createElement('option');option.value=record.id;option.textContent=new Date(record.created_at).toLocaleString()+` · ${record.metrics.duration_s.toFixed(1)}s`;$('recording-list').append(option);}
+    $('recording-list').disabled=false;
+    const requested=new URLSearchParams(location.search).get('id');
+    const id=list.results.some(r=>r.id===requested)?requested:list.results[0].id;$('recording-list').value=id;await show(id);
+  }catch(e){$('library-message').textContent='Could not load local results: '+e.message;}
+}
+init();
