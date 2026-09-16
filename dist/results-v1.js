@@ -607,13 +607,18 @@ function formatColour(t) {
 function renderChat(chat) {
   const c = $('chat-messages');
   c.innerHTML = '';
-  for (const msg of chat?.messages || []) {
+  const msgs = chat?.messages || [];
+  if (!msgs.length) {
+    c.innerHTML = '<div class="chat-empty">Ask the coach about your throw — technique, drills, or what to focus on next.</div>';
+    return;
+  }
+  for (const msg of msgs) {
     c.innerHTML +=
       `<div class="chat-msg ${msg.role === 'user' ? 'user' : 'coach'}">` +
       `<span class="msg-label">${msg.role === 'user' ? 'You' : 'Coach'}</span>` +
       `${esc(msg.text)}</div>`;
   }
-  c.scrollTop = c.scrollHeight;
+  requestAnimationFrame(() => { c.scrollTop = c.scrollHeight; });
 }
 
 // ── Video crop from wireframe ──
@@ -682,11 +687,15 @@ async function show(id) {
       $('advice-content').hidden = false;
       renderAdvice(record.advice.text, record.advice.provider, record.advice.model);
       renderChat(record.chat);
+      $('chat-input').disabled = !available;
+      $('chat-send').disabled = !available;
     } else {
       $('no-advice-section').hidden = false;
       $('advice-content').hidden = true;
       $('generate-advice').disabled = !available;
       $('generate-advice').textContent = 'Get coaching advice';
+      $('chat-input').disabled = true;
+      $('chat-send').disabled = true;
     }
     renderPipeline(record);
   } catch (e) {
@@ -854,6 +863,7 @@ async function sendChat() {
   if (!current || !available || chatBusy || !message) return;
   chatBusy = true;
   $('chat-send').disabled = true;
+  $('chat-input').disabled = true;
   $('chat-status').textContent = 'Coach is replying…';
   try {
     const chat = await api(`/api/results/${current.id}/chat`, {
@@ -870,6 +880,8 @@ async function sendChat() {
   } finally {
     chatBusy = false;
     $('chat-send').disabled = false;
+    $('chat-input').disabled = false;
+    $('chat-input').focus();
   }
 }
 

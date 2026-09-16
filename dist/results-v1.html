@@ -542,7 +542,7 @@
       }
       .chat-popup-input textarea {
         flex: 1;
-        resize: none;
+        resize: vertical;
         background: #10151b;
         color: #eef3f7;
         border: 1px solid #39434e;
@@ -550,8 +550,26 @@
         padding: 10px;
         font: inherit;
         font-size: 13px;
-        min-height: 40px;
-        max-height: 80px;
+        min-height: 44px;
+        max-height: 120px;
+      }
+      .chat-popup-input textarea:focus {
+        outline: 1px solid var(--accent);
+        border-color: var(--accent);
+      }
+      .chat-popup-input textarea:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .chat-popup-input button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .chat-empty {
+        color: #4a5568;
+        font-size: 13px;
+        text-align: center;
+        padding: 30px 20px;
       }
       .chat-popup-input button {
         font: inherit;
