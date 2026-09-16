@@ -3,7 +3,7 @@ export const HAND_NAMES=['wrist','thumb_cmc','thumb_mcp','thumb_ip','thumb_tip',
 const EDGES=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
 export async function createHandTracker(){
   const files=await FilesetResolver.forVisionTasks('./vendor/wasm');
-  return HandLandmarker.createFromOptions(files,{baseOptions:{modelAssetPath:'./vendor/hand_landmarker.task',delegate:'CPU'},runningMode:'VIDEO',numHands:2,minHandDetectionConfidence:.5,minHandPresenceConfidence:.5,minTrackingConfidence:.5});
+  return HandLandmarker.createFromOptions(files,{baseOptions:{modelAssetPath:'./vendor/hand_landmarker_full.task',delegate:'CPU'},runningMode:'VIDEO',numHands:2,minHandDetectionConfidence:.3,minHandPresenceConfidence:.3,minTrackingConfidence:.3});
 }
 export function collectHands(result){return result.landmarks.map((landmarks,i)=>({landmarks:landmarks.map(p=>({x:p.x,y:p.y,z:p.z})),handedness_model:result.handedness[i]?.[0]?.categoryName??null,handedness_score:result.handedness[i]?.[0]?.score??null}));}
 export function drawHands(ctx,hands,width,height){

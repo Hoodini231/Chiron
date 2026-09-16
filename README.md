@@ -1,4 +1,7 @@
+# Chiron - The Mythlical Coach 
 # Dodgeball Motion Lab
+
+Goal: POC into how good a generalised LLM can respond to kinetic data from wire framing to throw coaching11
 
 A local camera app with a full-height 75% video / 25% sidebar layout. The sidebar is split equally between stats/ball colour and advice. A separate Results page loads saved recordings.
 
@@ -33,7 +36,7 @@ Ball/body processing uses an image up to 640 pixels wide. All coordinates are ex
 
 OpenCV isolates the selected hue in HSV space. A narrow, strongly saturated colour core plus circularity and enclosing-circle fill checks acquires round silhouettes; a broader colour mask helps maintain an established track. A third mask searches 1.5× the selected hue tolerance (capped at 40 OpenCV hue units), permitting acquisition only with circularity ≥0.7, enclosing-circle fill ≥0.72, aspect ratio ≤1.5 and strong average saturation. This accommodates warm lighting without admitting arbitrary colour patches. Close-up balls may occupy up to 25% of the image, with the same strong-shape checks above 10%. This reduces skin/background matches without requiring a perfect circle during motion blur. The default minimum saturation is 140, with a core threshold 30 higher. Adjust tracking → Isolate ball colour preserves wider-search colour pixels and darkens/desaturates the rest of the processed preview and recording; the original recording remains available. Use the colour picker when a preset does not match the real ball.
 
-The hand and pose models run before ball association on the same frozen frame. A ball near a hand gets an acquisition preference; that preference is removed after two observations of increasing separation from its associated hand. `near_hand`, `flight` and `unassociated` are tracking heuristics, not validated grip or release events. A missing hand alone never signals release.
+The hand and pose models run before ball association on the same frozen frame. A ball near a hand gets an acquisition preference. Once acquired, association and gap predictions follow the ball’s own measured motion; hand position cannot pull the track back, even before a release label is established. Two observations of increasing separation from its associated hand can label the track as flight. `near_hand`, `flight` and `unassociated` are tracking heuristics, not validated grip or release events. A missing hand alone never signals release.
 
 The velocity predictor searches near the expected next position and updates from actual detections, allowing curved paths. Elongated colour streaks require motion support and alignment; they cannot start a track. A short gap shows an amber dashed prediction for at most 0.2 seconds. It is stored in `ball_prediction` with `observed:false`; the measured `ball` remains null, and predictions do not inflate visibility stats or enter the trajectory plot. After 0.5 seconds without a match, reacquisition gets a new `track_id`; trails do not connect different identities. The established live identity survives pressing Start.
 

@@ -9,16 +9,22 @@ const small = document.createElement('canvas'), sctx = small.getContext('2d', {w
 const rawFrame=document.createElement('canvas'), rawContext=rawFrame.getContext('2d');
 const isolatedFrame=document.createElement('canvas');
 let tracker, poseTracker, handTracker, stream, ready = false, opening = false, recording = null, picking = false, pendingSave = null;
+let uploadedFile=null, uploadURL=null, frameHandle=null, seekProcessing=false, mlTimestamp=0;
 let config = {colour:'red', hue:0, tolerance:14, saturation:140, isolate:false};
 let trail = [], latestTime = 0, lastFrame = -1, lastWall = 0, fps = 0, urls = [], finalizing = false;
+const FRAME_STEP = 1 / 30;
 
 function error(message) { $('error').textContent = message; $('error').hidden = !message; }
 function controls() {
   const active = !!recording || finalizing || !!pendingSave;
-  $('start').disabled = !ready || !stream || active;
+  $('start').disabled = !ready || !(stream||uploadedFile) || active || opening;
+  $('start').textContent=uploadedFile?'▶ Process video':'● Start recording';
+  $('upload').disabled=$('upload-empty').disabled=active||opening;
+  $('camera-source').hidden=!uploadedFile;
+  $('camera-source').disabled=active||opening;
   $('stop').disabled = !recording;
   $('enable').disabled = opening;
-  $('sample').disabled = !stream || !ready || active;
+  $('sample').disabled = !(stream||uploadedFile) || !ready || active;
   document.querySelectorAll('#colours input, input[type=range], #isolate').forEach(e => e.disabled = active);
 }
 async function loadTracker() {
@@ -55,7 +61,8 @@ async function loadHands(){
   catch(e){error('Could not load hand tracking. Reload to retry.');$('hand-state').textContent='Unavailable';}
 }
 async function enableCamera() {
-  if (opening || stream) return;
+  if (opening || stream || recording || finalizing || pendingSave) return;
+  clearSource();
   opening = true; error(''); controls();
   try {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera access needs HTTPS or localhost in a supported browser.');
@@ -77,15 +84,52 @@ async function enableCamera() {
     error(messages[e.name] || e.message);
   } finally { opening = false; controls(); }
 }
+function clearSource(){
+  if(frameHandle!==null){video.cancelVideoFrameCallback?.(frameHandle);cancelAnimationFrame(frameHandle);frameHandle=null;}
+  stream?.getTracks().forEach(track=>track.stop());stream=null;video.pause();video.srcObject=null;
+  if(uploadURL)URL.revokeObjectURL(uploadURL);
+  uploadURL=null;uploadedFile=null;video.removeAttribute('src');tracker?.reset();trail=[];lastFrame=-1;
+}
+async function uploadVideo(file){
+  if(!file||recording||finalizing||pendingSave||opening)return;
+  if(file.size>160*1024*1024){error('Choose a video smaller than 160 MB.');return;}
+  const type=file.type || (/\.mp4$/i.test(file.name)?'video/mp4':/\.webm$/i.test(file.name)?'video/webm':'');
+  if(!['video/mp4','video/webm'].includes(type)){error('Choose an MP4 or WebM video.');return;}
+  opening=true;controls();error('');clearSource();
+  try{
+    uploadURL=URL.createObjectURL(file);
+    video.autoplay=false;
+    await new Promise((resolve,reject)=>{
+      const done=()=>{cleanup();resolve();},fail=()=>{cleanup();reject(new Error('This browser could not decode that video. Try MP4 or WebM.'));};
+      const timer=setTimeout(fail,15000);
+      const cleanup=()=>{clearTimeout(timer);video.removeEventListener('loadeddata',done);video.removeEventListener('error',fail);};
+      video.addEventListener('loadeddata',done);video.addEventListener('error',fail);video.src=uploadURL;video.load();
+    });
+    if(!Number.isFinite(video.duration)||video.duration<=0||video.duration>120)throw new Error('Choose a video up to 2 minutes long.');
+    uploadedFile=file.type?file:new File([file],file.name,{type});
+    canvas.width=video.videoWidth;canvas.height=video.videoHeight;rawFrame.width=canvas.width;rawFrame.height=canvas.height;
+    small.width=Math.min(640,canvas.width);small.height=Math.round(canvas.height*small.width/canvas.width);
+    $('empty').hidden=true;$('mode').textContent='UPLOADED VIDEO';$('elapsed').textContent='00:00.0';
+    $('status').textContent='Choose ball colour, then press Process video. Keep this page visible until it finishes.';
+    frame(performance.now(),{mediaTime:video.currentTime});
+  }catch(e){clearSource();$('empty').hidden=false;error(e.message);}
+  finally{opening=false;controls();}
+}
+$('upload').onclick=$('upload-empty').onclick=()=>{$('video-file').value='';$('video-file').click();};
+$('video-file').onchange=()=>uploadVideo($('video-file').files[0]);
+$('camera-source').onclick=enableCamera;
+video.addEventListener('ended',()=>{if(uploadedFile&&!recording)stopRecording();});
+
 function scheduleFrame() {
-  if (!stream) return;
-  if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(frame);
-  else requestAnimationFrame(now => frame(now, {mediaTime:video.currentTime}));
+  if (!(stream||uploadedFile)) return;
+  if (video.requestVideoFrameCallback) frameHandle=video.requestVideoFrameCallback(frame);
+  else frameHandle=requestAnimationFrame(now => frame(now, {mediaTime:video.currentTime}));
 }
 function frame(now, metadata) {
-  if (!stream) return;
+  frameHandle=null;
+  if (!(stream||uploadedFile)) return;
   const t = metadata.mediaTime;
-  if (lastFrame === t || video.readyState < 2) {scheduleFrame(); return;}
+  if ((!seekProcessing && lastFrame === t) || video.readyState < 2) {scheduleFrame(); return;}
   lastFrame = t; latestTime = t;
   const dt = (now - lastWall) / 1000; lastWall = now;
   if (dt > 0 && dt < 1) fps = fps ? fps * .9 + (1 / dt) * .1 : 1 / dt;
@@ -95,8 +139,9 @@ function frame(now, metadata) {
   let ball = null, pose = null, hands = [];
   if (ready) {
     try {
-      pose = poseTracker.detectForVideo(small, now).landmarks[0] ?? null;
-      hands = handFeatures(collectHands(handTracker.detectForVideo(rawFrame,now)),pose,canvas.width,canvas.height);
+      mlTimestamp = seekProcessing ? mlTimestamp + 33.34 : now;
+      pose = poseTracker.detectForVideo(small, mlTimestamp).landmarks[0] ?? null;
+      hands = handFeatures(collectHands(handTracker.detectForVideo(rawFrame,mlTimestamp)),pose,canvas.width,canvas.height);
       ball = tracker.detect(small, t, config, {hands, pose, isolationCanvas:config.isolate?isolatedFrame:null});
       if(config.isolate)ctx.drawImage(isolatedFrame,0,0,canvas.width,canvas.height);
     } catch(e) {ready = false; stopRecording(); error('A processing pipeline failed. Reload the page to reset it.'); controls();}
@@ -143,7 +188,7 @@ function frame(now, metadata) {
     r.processedStream.getVideoTracks()[0].requestFrame?.();
     if (performance.now() - r.startWall >= 120000) stopRecording();
   }
-  scheduleFrame();
+  if (!seekProcessing) scheduleFrame();
 }
 function recorderFor(source, chunks) {
   const mimeType = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/mp4','video/webm'].find(t => MediaRecorder.isTypeSupported(t));
@@ -151,25 +196,36 @@ function recorderFor(source, chunks) {
   recorder.ondataavailable = e => {if (e.data.size) chunks.push(e.data);};
   return recorder;
 }
-function startRecording() {
-  if (!ready || !stream || recording || finalizing) return;
+async function startRecording() {
+  if (!ready || !(stream||uploadedFile) || recording || finalizing || opening || pendingSave) return;
+  if(uploadedFile){
+    opening=true;controls();
+    try{
+      video.pause();
+      if(video.currentTime>0){await new Promise((resolve,reject)=>{video.addEventListener('seeked',resolve,{once:true});video.addEventListener('error',reject,{once:true});video.currentTime=0;});}
+      tracker.reset();lastFrame=-1;
+    }finally{opening=false;controls();}
+  }
   error(''); picking = false; canvas.parentElement.classList.remove('sampling');
   let r;
   try {
     if (!window.MediaRecorder || !canvas.captureStream) throw new Error('Recording is unavailable in this browser. Try a current Chrome, Edge or Safari browser.');
-    // Keep the established ball identity when recording starts.
     trail = [];
     const processedStream = canvas.captureStream(0);
     if (!processedStream.getVideoTracks()[0].requestFrame) {
       processedStream.getTracks().forEach(t => t.stop());
       throw new Error('This browser cannot capture processed frames reliably. Please use Chrome or Edge.');
     }
-    r = {processedStream,chunks:[],rawChunks:[],samples:[],origin:null,startWall:performance.now(),config:{...config},settings:stream.getVideoTracks()[0].getSettings()};
-    r.processed = recorderFor(processedStream, r.chunks); r.raw = recorderFor(stream, r.rawChunks);
-    r.finished = Promise.all([r.processed,r.raw].map(rec => new Promise(resolve => {
+    r = {processedStream,chunks:[],rawChunks:[],samples:[],origin:uploadedFile?0:null,startWall:performance.now(),config:{...config},file:uploadedFile,settings:stream?.getVideoTracks()[0].getSettings()??{}};
+    r.processed = recorderFor(processedStream, r.chunks); r.raw = uploadedFile?null:recorderFor(stream, r.rawChunks);
+    r.finished = Promise.all([r.processed,r.raw].filter(Boolean).map(rec => new Promise(resolve => {
       rec.onstop = resolve; rec.onerror = () => {r.failed = true; error('Recording failed. Start a new clip.'); stopRecording();};
     })));
-    recording = r; r.processed.start(1000); r.raw.start(1000);
+    recording = r; r.processed.start(1000); r.raw?.start(1000);
+    if(uploadedFile){
+      await processUploadedVideo(r);
+      return;
+    }
     r.timer = setTimeout(stopRecording, 120000);
     $('mode').textContent = '● RECORDING'; $('status').textContent = 'Recording body + ball + hands'; controls();
   } catch(e) {
@@ -177,32 +233,60 @@ function startRecording() {
     error(e.message); controls();
   }
 }
+async function processUploadedVideo(r) {
+  seekProcessing = true;
+  $('mode').textContent = '● PROCESSING'; controls();
+  const duration = video.duration;
+  let t = 0;
+  try {
+    while (t < duration && recording === r && !r.failed) {
+      video.currentTime = t;
+      await new Promise((resolve, reject) => {
+        video.addEventListener('seeked', resolve, {once: true});
+        video.addEventListener('error', reject, {once: true});
+      });
+      if (video.readyState < 2) await new Promise(resolve => {
+        video.addEventListener('canplay', resolve, {once: true});
+      });
+      frame(performance.now(), {mediaTime: t});
+      $('status').textContent = `Processing frame ${r.samples.length} · ${t.toFixed(1)}s / ${duration.toFixed(1)}s`;
+      await new Promise(resolve => setTimeout(resolve, 0));
+      t += FRAME_STEP;
+    }
+  } finally {
+    seekProcessing = false;
+  }
+  stopRecording();
+}
 async function stopRecording() {
   if (!recording) return;
-  const r = recording; recording = null; finalizing = true; clearTimeout(r.timer); controls();
+  const r = recording; recording = null;
+  if(r.file)video.pause(); finalizing = true; clearTimeout(r.timer); controls();
   $('status').textContent = 'Finishing recording…';
-  [r.processed,r.raw].forEach(rec => {if (rec.state !== 'inactive') rec.stop();});
+  [r.processed,r.raw].filter(Boolean).forEach(rec => {if (rec.state !== 'inactive') rec.stop();});
   await r.finished;
   r.processedStream.getTracks().forEach(t => t.stop());
-  finalizing = false; $('mode').textContent = stream ? 'LIVE CAMERA' : 'CAMERA OFF';
+  finalizing = false; $('mode').textContent = uploadedFile?'UPLOADED VIDEO':stream ? 'LIVE CAMERA' : 'CAMERA OFF';
   if (!r.failed && r.chunks.length && r.samples.length) {
     urls.forEach(URL.revokeObjectURL); urls = [];
     const detected = r.samples.filter(s => s.ball).length;
     const duration = r.samples.at(-1).t_s;
-    const report = {schema_version:'0.2',created_at:new Date().toISOString(),measurement_mode:'single_camera_uncalibrated',coordinate_system:{origin:'top_left',x:'right',y:'down',unit:'pixel',width:canvas.width,height:canvas.height},capture:{requested_fps:60,reported_camera_fps:r.settings.frameRate??null,processed_frames:r.samples.length,duration_s:duration,timestamp_source:video.requestVideoFrameCallback?'requestVideoFrameCallback.mediaTime':'video.currentTime',recording_frame_alignment:'t_s=0 is first processed frame after record start; recorder startup offset is not calibrated'},tracking:{method:'opencv_hsv_contours',...r.config,score_is_probability:false,detection_fraction:detected/r.samples.length},body_pipeline:{model:'mediapipe_pose_landmarker_lite',version:'0.10.21',landmark_names:LANDMARK_NAMES,xy_units:'normalized_image_width_and_height',z_units:'model_relative_depth_not_calibrated',joint_angles:'projected_2d_degrees',visibility_threshold_for_angles:0.6},limitations:['No metric calibration','Throw events are not implemented','Tracking score is heuristic','Video records browser processing cadence, not high-speed camera acquisition','Original and processed recorder start times may differ slightly'],samples:r.samples};
+    const report = {schema_version:'0.2',created_at:new Date().toISOString(),measurement_mode:'single_camera_uncalibrated',coordinate_system:{origin:'top_left',x:'right',y:'down',unit:'pixel',width:canvas.width,height:canvas.height},capture:{requested_fps:60,reported_camera_fps:r.settings.frameRate??null,processed_frames:r.samples.length,duration_s:duration,timestamp_source:video.requestVideoFrameCallback?'requestVideoFrameCallback.mediaTime':'video.currentTime',recording_frame_alignment:'t_s=0 is first processed frame after record start; recorder startup offset is not calibrated'},tracking:{method:'opencv_colour_segmentation_and_validated_circle_edges',...r.config,score_is_probability:false,detection_fraction:detected/r.samples.length},body_pipeline:{model:'mediapipe_pose_landmarker_full',version:'0.10.21',landmark_names:LANDMARK_NAMES,xy_units:'normalized_image_width_and_height',z_units:'model_relative_depth_not_calibrated',joint_angles:'projected_2d_degrees',visibility_threshold_for_angles:0.6},limitations:['No metric calibration','Throw events are not implemented','Tracking score is heuristic','Video records browser processing cadence, not high-speed camera acquisition','Original and processed recorder start times may differ slightly'],samples:r.samples};
+    report.capture.source=r.file?'uploaded_video':'camera';
+    if(r.file){report.capture.original_filename=r.file.name;report.capture.original_duration_s=video.duration;report.capture.processed_segment_s=[0,duration];}
     report.metrics = summarize(report);
-    report.tracking.association='hand_assisted_motion_prediction_v1';
+    report.tracking.association='hand_acquisition_ball_motion_v2';
     report.tracking.prediction_horizon_s=.2;
     report.tracking.identity_timeout_s=.5;
     report.tracking.phase_is_heuristic=true;
-    report.tracking.colour_masks={acquisition:'colour_core_or_wide_colour_round_shape',shape_hue_tolerance:Math.min(40,r.config.tolerance*1.5),shape_min_circularity:.7,shape_min_circle_fill:.72,max_frame_area_fraction:.25,core_hue_tolerance:Math.max(3,r.config.tolerance*.55),core_min_saturation:Math.min(255,r.config.saturation+30),tracking:'core_broad_and_shape'};
+    report.tracking.colour_masks={acquisition:'colour_core_or_wide_colour_round_shape',shape_hue_tolerance:Math.min(40,r.config.tolerance*1.5),shape_min_circularity:.7,shape_min_circle_fill:.72,max_frame_area_fraction:.25,core_hue_tolerance:Math.max(3,r.config.tolerance*.55),core_min_saturation:Math.min(255,r.config.saturation+30),tracking:'core_broad_shape_saturated_and_edge_validated_objects'};
     report.limitations.push('Ball tracking phases are association heuristics, not validated release events; dashed predictions are excluded from measured ball positions');
     report.hands_pipeline={model:'mediapipe_hand_landmarker',version:'0.10.21',landmark_names:HAND_NAMES,xy_units:'normalized_image_width_and_height',z_units:'model_relative_depth_not_calibrated',handedness_score_is_landmark_confidence:false,association:'nearest_visible_pose_wrist_one_to_one_with_distance_gate',features:'projected_2d_degrees; wrist bend is signed forearm-to-middle-MCP direction, not anatomical flexion',frame_orientation:'unmirrored'};
     report.limitations.push('Hand landmarks do not measure ball spin, grip force, or true 3D curvature','Small or occluded hands may be missed; handedness score is classification confidence only');
     const stamp = new Date().toISOString().replace(/[:.]/g,'-');
     function attach(id, blob, name) {const url = URL.createObjectURL(blob); urls.push(url); $(id).href=url; $(id).download=name; return url;}
-    const mime = r.processed.mimeType || r.chunks[0].type, rawMime = r.raw.mimeType || r.rawChunks[0]?.type || 'video/webm';
-    const processedBlob = new Blob(r.chunks,{type:mime}), rawBlob = new Blob(r.rawChunks,{type:rawMime});
+    const mime = r.processed.mimeType || r.chunks[0].type, rawMime = r.file?.type || r.raw?.mimeType || r.rawChunks[0]?.type || 'video/webm';
+    const processedBlob = new Blob(r.chunks,{type:mime}), rawBlob = r.file || new Blob(r.rawChunks,{type:rawMime});
     $('playback').src = attach('download-video',processedBlob,`throw-${stamp}-processed.${mime.includes('mp4')?'mp4':'webm'}`);
     attach('download-raw',rawBlob,`throw-${stamp}-original.${rawMime.includes('mp4')?'mp4':'webm'}`);
     attach('download-data',new Blob([JSON.stringify(report,null,2)],{type:'application/json'}),`throw-${stamp}.json`);
@@ -212,7 +296,7 @@ async function stopRecording() {
     pendingSave = {report,processedBlob,rawBlob};
     await saveResult();
   } else {error('No usable frames were recorded. Try a longer recording.'); $('status').textContent = 'Ready to retry';}
-  controls();c
+  controls();
 }
 async function saveResult() {
   if (!pendingSave) return;
@@ -239,7 +323,7 @@ document.querySelectorAll('[name=colour]').forEach(input => input.onchange = () 
 ['tolerance','saturation'].forEach(id => $(id).oninput = () => {config[id]=Number($(id).value); $(id+'-value').textContent=$(id).value; tracker?.reset(); trail=[];});
 $('sample').onclick = () => {picking = !picking; canvas.parentElement.classList.toggle('sampling',picking); $('sample-hint').textContent=picking?'Click the centre of the ball in the live video.':'Sample the centre of the ball for your lighting.';};
 canvas.onclick = e => {
-  if (!picking || !ready || !stream || recording) return;
+  if (!picking || !ready || !(stream||uploadedFile) || recording) return;
   const rect = canvas.getBoundingClientRect();
   // object-fit: contain may letterbox non-16:9 cameras.
   const scale = Math.min(rect.width/canvas.width, rect.height/canvas.height);
@@ -257,7 +341,7 @@ canvas.onclick = e => {
   $('sample-hint').textContent='Sampled colour active. Adjust tolerance if needed.';
 };
 document.addEventListener('visibilitychange',() => {if (document.hidden && recording) {stopRecording(); error('Recording stopped because the page was hidden. Keep this tab visible while recording.');}});
-window.addEventListener('pagehide',() => {stream?.getTracks().forEach(t=>t.stop()); poseTracker?.close(); handTracker?.close(); urls.forEach(URL.revokeObjectURL);});
+window.addEventListener('pagehide',() => {if(uploadURL)URL.revokeObjectURL(uploadURL);stream?.getTracks().forEach(t=>t.stop()); poseTracker?.close(); handTracker?.close(); urls.forEach(URL.revokeObjectURL);});
 if (document.modelContext?.registerTool) {
   const lifecycle = new AbortController();
   const tool = {

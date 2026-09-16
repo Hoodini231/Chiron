@@ -77,3 +77,26 @@ test('camera timestamp restart clears stale identity and velocity',()=>{
   const found=update(tracker,[ball(400)],0);
   assert.equal(found.x,400);assert.equal(tracker.velocity.x,0);
 });
+
+
+test('retracting hand cannot pull the ball track back before flight is confirmed',()=>{
+  const tracker=new BallMotion();
+  const first=update(tracker,[ball(100)],0,context(100));
+  update(tracker,[ball(130)],.05,context(130));
+  const released=update(tracker,[ball(90),ball(160)],.1,context(90));
+  assert.equal(released.x,160);
+  assert.equal(released.track_id,first.track_id);
+  assert.equal(released.tracking_phase,'near_hand');
+  // Even short-gap predictions must follow the ball, not the retracting wrist.
+  assert.equal(update(tracker,[],.15,context(60)),null);
+  assert.ok(Math.abs(tracker.status.prediction.x-190)<1e-6);
+  const next=update(tracker,[ball(60),ball(220)],.2,context(60));
+  assert.equal(next.x,220);assert.equal(next.track_id,first.track_id);
+});
+
+
+test('irregular yellow regions do not sustain an established ball identity',()=>{
+  const tracker=new BallMotion();update(tracker,[ball(100)],0);
+  assert.equal(update(tracker,[ball(105,180,12,{circularity:.45,circleFill:.5})],.05),null);
+  assert.equal(tracker.status.state,'predicted');
+});

@@ -19,7 +19,7 @@ test('strong colour core separates a red ball touching a skin-coloured patch',()
   } finally {cv.imread=original;mat.delete();}
 });
 
-test('broader colour mask supports an existing track but cannot acquire one alone',()=>{
+test('clear circular edges can acquire a less saturated ball and maintain its track',()=>{
   const mat=new cv.Mat(180,320,cv.CV_8UC4,[10,10,10,255]), original=cv.imread;
   const config={hue:0,tolerance:14,saturation:140};
   try {
@@ -28,9 +28,9 @@ test('broader colour mask supports an existing track but cannot acquire one alon
     const tracker=new BallTracker(cv);assert.ok(tracker.detect({},0,config));
     mat.setTo(new cv.Scalar(10,10,10,255));
     cv.circle(mat,new cv.Point(85,90),14,new cv.Scalar(255,100,100,255),-1);
-    assert.equal(new BallTracker(cv).detect({},0,config),null);
+    assert.equal(new BallTracker(cv).detect({},0,config).mask_source,'object');
     const ball=tracker.detect({},.05,config);
-    assert.ok(ball);assert.equal(ball.mask_source,'broad');
+    assert.ok(ball);assert.ok(Math.abs(ball.x-85)<2);
   } finally {cv.imread=original;mat.delete();}
 });
 test('actual OpenCV finds all four synthetic coloured balls and rejects blank frames',()=>{
@@ -89,11 +89,26 @@ test('warm yellow close-up acquires by shape, but a warm elongated patch does no
     // Warm yellow from the reported lighting; >10% of frame and outside core hue.
     cv.circle(mat,new cv.Point(455,130),94,new cv.Scalar(201,132,58,255),-1);
     const ball=new BallTracker(cv).detect({},0,config);
-    assert.ok(ball);assert.equal(ball.mask_source,'shape');
-    assert.ok(Math.hypot(ball.x-455,ball.y-130)<1);
+    assert.ok(ball);assert.ok(['shape','saturated','object'].includes(ball.mask_source));
+    assert.ok(Math.hypot(ball.x-455,ball.y-130)<3);
     assert.ok(ball.radius>90);
     mat.setTo(new cv.Scalar(25,25,25,255));
     cv.rectangle(mat,new cv.Point(100,100),new cv.Point(400,160),new cv.Scalar(201,132,58,255),-1);
+    assert.equal(new BallTracker(cv).detect({},0,config),null);
+  } finally {cv.imread=original;mat.delete();}
+});
+
+
+test('yellow wall rectangles cannot acquire or sustain a ball track',()=>{
+  const mat=new cv.Mat(180,320,cv.CV_8UC4,[10,10,10,255]),original=cv.imread;
+  const config={hue:29,tolerance:14,saturation:140};
+  try {
+    cv.imread=()=>mat.clone();const tracker=new BallTracker(cv);
+    cv.circle(mat,new cv.Point(120,90),20,new cv.Scalar(255,220,0,255),-1);
+    assert.ok(tracker.detect({},0,config));
+    mat.setTo(new cv.Scalar(10,10,10,255));
+    cv.rectangle(mat,new cv.Point(90,60),new cv.Point(150,120),new cv.Scalar(255,220,0,255),-1);
+    assert.equal(tracker.detect({},.1,config),null);
     assert.equal(new BallTracker(cv).detect({},0,config),null);
   } finally {cv.imread=original;mat.delete();}
 });

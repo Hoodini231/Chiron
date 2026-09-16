@@ -55,25 +55,25 @@ export class BallMotion {
     this.lastTime=time;
     const anchors=handAnchors(context,width,height), previous=this.last;
     const dt=previous ? time-previous.t : 0;
-    let predicted=previous ? {x:previous.x+this.velocity.x*dt, y:previous.y+this.velocity.y*dt} : null;
+    const predicted=previous ? {x:previous.x+this.velocity.x*dt, y:previous.y+this.velocity.y*dt} : null;
     const owner=this.owner && anchors.find(a => a.id===this.owner.id && distance(a,this.owner)<Math.hypot(width,height)*.35);
-    if (predicted && this.phase==='near_hand' && owner) {
-      predicted={x:previous.x+owner.x-this.owner.x, y:previous.y+owner.y-this.owner.y};
-    }
+    // Hands help acquisition and phase labels, but never move an established ball track.
     const speed=Math.hypot(this.velocity.x,this.velocity.y);
     const gate=previous ? Math.max(24,previous.sizeRadius*3)+width*dt*.6+speed*dt*.65 : Infinity;
     // Launch can accelerate sharply before velocity has been established.
-    const searchGate=previous && this.phase!=='flight' ? Math.max(gate,width*dt*5,previous.sizeRadius*6) : gate;
+    const searchGate=previous && this.phase!=='flight' ? Math.max(gate,width*dt*2.5,previous.sizeRadius*4) : gate;
     const hint=this.hint && time-this.hint.t<1 ? {x:this.hint.x*width,y:this.hint.y*height} : null;
     let best=null;
     for (const candidate of candidates) {
       const c={...candidate,sizeRadius:candidate.sizeRadius ?? candidate.radius};
       const aspect=c.aspect ?? 1, circularity=c.circularity ?? 1;
-      if (!previous && !hint && (circularity<.5 || (c.circleFill ?? 1)<.55 || c.maskSource==='broad' || ((c.maskSource==='shape' || c.large) && !c.strongShape))) continue;
+      if (!previous && !hint && (circularity<.5 || (c.circleFill ?? 1)<.55 || c.maskSource==='broad' || ((c.maskSource==='shape' || c.maskSource==='saturated' || c.large) && !c.strongShape))) continue;
       const residual=predicted ? distance(c,predicted) : 0;
       if (previous && residual>searchGate) continue;
       // Elongated streaks are accepted only when supported by a moving track.
-      const blurred=aspect>2.5;
+      const blurred=aspect>1.8;
+      // Colour alone must never sustain a track on clothing or a wall.
+      if (!blurred && (circularity<.7 || (c.circleFill ?? 1)<.72)) continue;
       if (blurred && (!previous || speed<width*.2 || residual>searchGate*.7)) continue;
       if (blurred && c.axis && speed>0) {
         const alignment=Math.abs((c.axis.x*this.velocity.x+c.axis.y*this.velocity.y)/speed);
@@ -88,14 +88,15 @@ export class BallMotion {
       const motion=predicted ? Math.exp(-2.5*(residual/searchGate)**2) : 0;
       let score;
       if (previous) {
-        // Hand influence ends in flight, so a ball can leave the player freely.
-        const handWeight=this.phase==='near_hand' ? .12 : this.phase==='flight' ? 0 : .05;
-        score=(.62-handWeight)*motion+.15*size+.1*colour+.13*(blurred ? .7 : shape)+handWeight*(near?.closeness ?? 0);
+        // Release labels can lag the actual throw. Association must follow ball evidence
+        // immediately, even while the heuristic phase still says near_hand.
+        score=.62*motion+.15*size+.1*colour+.13*(blurred ? .7 : shape);
       } else {
         // Proximity alone must not turn a skin/clothing patch into a ball.
         score=anchors.length ? .25*(near?.closeness ?? 0)+.4*shape**2+.3*colour+.05*size : .55*shape**2+.35*colour+.1*size;
         if (hint) score=.4*score+.6*Math.exp(-(distance(c,hint)**2)/(2*Math.max(25,c.radius*3)**2));
       }
+      if (previous && score<.62) continue;
       if (!best || score>best.score) best={...c,score,near};
     }
     if (!best) {
@@ -142,7 +143,7 @@ export class BallMotion {
     const observed={x:best.x,y:best.y,radius:best.radius,score:best.score,t:time,observed:true,track_id:id,
       tracking_phase:this.phase,hand_distance_px:handEvidence?.gap ?? null,
       hand_source:handEvidence?.anchor.source ?? null,hand_side:handEvidence?.anchor.side ?? null,
-      blurred:best.aspect>2.5,mask_source:best.maskSource ?? null};
+      blurred:best.aspect>1.8,mask_source:best.maskSource ?? null};
     this.last={...observed,sizeRadius:previous ? previous.sizeRadius*.75+best.sizeRadius*.25 : best.sizeRadius,observations:(previous?.observations ?? 0)+1};
     this.hint=null;
     this.status={state:'observed',phase:this.phase,track_id:id,prediction:null};

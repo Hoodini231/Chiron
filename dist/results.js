@@ -1,5 +1,30 @@
 const $=id=>document.getElementById(id);
 let current=null, available=false, busy=false, loadToken=0, chatBusy=false;
+const FRAME_DUR=1/30;
+function formatTime(s){if(!Number.isFinite(s))return '0:00.0';const m=Math.floor(s/60);return `${m}:${(s%60).toFixed(1).padStart(4,'0')}`;}
+function initPlaybackControls(){
+  const v=$('result-video'),panel=$('playback-controls');
+  function sync(){$('pb-current').textContent=formatTime(v.currentTime);$('pb-play').textContent=v.paused?'▶':'⏸';}
+  v.addEventListener('timeupdate',sync);v.addEventListener('pause',sync);v.addEventListener('play',sync);
+  v.addEventListener('loadedmetadata',()=>{$('pb-duration').textContent=formatTime(v.duration);sync();});
+  $('pb-play').onclick=()=>{v.paused?v.play():v.pause();};
+  $('pb-skip-back').onclick=()=>{v.currentTime=Math.max(0,v.currentTime-5);};
+  $('pb-skip-fwd').onclick=()=>{v.currentTime=Math.min(v.duration,v.currentTime+5);};
+  $('pb-frame-back').onclick=()=>{v.pause();v.currentTime=Math.max(0,v.currentTime-FRAME_DUR);};
+  $('pb-frame-fwd').onclick=()=>{v.pause();v.currentTime=Math.min(v.duration,v.currentTime+FRAME_DUR);};
+  $('pb-speed').onchange=()=>{v.playbackRate=parseFloat($('pb-speed').value);};
+  document.addEventListener('keydown',e=>{
+    if(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT')return;
+    if(e.code==='Space'){e.preventDefault();v.paused?v.play():v.pause();}
+    else if(e.code==='ArrowLeft'&&e.shiftKey){v.currentTime=Math.max(0,v.currentTime-5);}
+    else if(e.code==='ArrowRight'&&e.shiftKey){v.currentTime=Math.min(v.duration,v.currentTime+5);}
+    else if(e.code==='ArrowLeft'){v.pause();v.currentTime=Math.max(0,v.currentTime-FRAME_DUR);}
+    else if(e.code==='ArrowRight'){v.pause();v.currentTime=Math.min(v.duration,v.currentTime+FRAME_DUR);}
+    else if(e.code==='Comma'){const i=$('pb-speed').selectedIndex;if(i>0){$('pb-speed').selectedIndex=i-1;v.playbackRate=parseFloat($('pb-speed').value);}}
+    else if(e.code==='Period'){const i=$('pb-speed').selectedIndex;if(i<$('pb-speed').options.length-1){$('pb-speed').selectedIndex=i+1;v.playbackRate=parseFloat($('pb-speed').value);}}
+  });
+}
+initPlaybackControls();
 const drafts=new Map();
 function chatControls(){const disabled=!current||!available||chatBusy; $('chat-input').disabled=disabled; $('chat-send').disabled=disabled;}
 function renderChat(){ $('chat-messages').replaceChildren(); for(const message of current?.chat?.messages??[]){const item=document.createElement('div'),label=document.createElement('strong'),body=document.createElement('p');item.className='chat-message '+message.role;label.textContent=message.role==='user'?'You':'Coach';body.textContent=message.text;item.append(label,body);$('chat-messages').append(item);} const scroller=document.querySelector('.conversation-scroll');scroller.scrollTop=scroller.scrollHeight; }
@@ -13,7 +38,7 @@ async function show(id) {
   try {
     const record=await api('/api/results/'+encodeURIComponent(id)); if(token!==loadToken)return;
     current=record;renderChat();$('chat-input').value=drafts.get(id)||'';chatControls(); history.replaceState(null,'','results.html?id='+id);
-    $('empty-library').hidden=true; $('result-video').hidden=false;
+    $('empty-library').hidden=true; $('result-video').hidden=false; $('playback-controls').hidden=false;
     $('result-video').src=`/results/${id}/${record.processed}`;
     $('original-link').href=`/results/${id}/${record.original}`; $('original-link').hidden=false;
     $('json-link').href=`/results/${id}/data.json`; $('json-link').download=`throw-${id}.json`;

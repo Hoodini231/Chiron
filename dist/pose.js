@@ -3,7 +3,7 @@ export const LANDMARK_NAMES = ['nose','left_eye_inner','left_eye','left_eye_oute
 const EDGES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[27,29],[29,31],[28,30],[30,32]];
 export async function createPoseTracker() {
   const files = await FilesetResolver.forVisionTasks('./vendor/wasm');
-  return PoseLandmarker.createFromOptions(files, {baseOptions:{modelAssetPath:'./vendor/pose_landmarker_lite.task',delegate:'CPU'},runningMode:'VIDEO',numPoses:1,minPoseDetectionConfidence:.5,minPosePresenceConfidence:.5,minTrackingConfidence:.5,outputSegmentationMasks:false});
+  return PoseLandmarker.createFromOptions(files, {baseOptions:{modelAssetPath:'./vendor/pose_landmarker_full.task',delegate:'CPU'},runningMode:'VIDEO',numPoses:1,minPoseDetectionConfidence:.4,minPosePresenceConfidence:.4,minTrackingConfidence:.4,outputSegmentationMasks:false});
 }
 export function drawPose(ctx, landmarks, width, height) {
   if (!landmarks) return;
