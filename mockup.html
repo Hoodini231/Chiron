@@ -1,0 +1,1310 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Results Mockup</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #e7ebf0;
+        background: #101319;
+        --green: #7ee787;
+        --green-bg: #1a2e1a;
+        --green-border: #2d4a2d;
+        --red: #f47067;
+        --red-bg: #2e1a1a;
+        --red-border: #4a2d2d;
+        --yellow: #d2a825;
+        --yellow-bg: #2e2a14;
+        --yellow-border: #4a4020;
+        --card-bg: #161b24;
+        --card-border: #252d3a;
+        --surface: #1a2030;
+        --muted: #8b99ad;
+        --accent: #c5f36b;
+      }
+      * { box-sizing: border-box; margin: 0; }
+      body { padding: 0; }
+
+      /* ── Top bar ── */
+      .top-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 24px;
+        background: #0d1017;
+        border-bottom: 1px solid #252d3a;
+        font-size: 13px;
+      }
+      .top-bar a { color: var(--accent); text-decoration: none; }
+      .top-bar select {
+        background: #1d2530;
+        border: 1px solid #3c4552;
+        color: inherit;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 13px;
+      }
+
+      /* ── Main layout ── */
+      .page {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      /* ── Hero row: video + score column ── */
+      .hero {
+        display: grid;
+        grid-template-columns: 380px 1px 1fr;
+        gap: 24px;
+        align-items: stretch;
+      }
+
+      /* ── Video panel (cropped, smaller) ── */
+      .video-panel {
+        background: #080b10;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--card-border);
+      }
+      .video-crop {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 3 / 4;
+        background: #050810;
+        overflow: hidden;
+        display: grid;
+        place-items: center;
+      }
+      .video-crop video {
+        width: 140%;
+        margin-left: -20%;
+        margin-top: -5%;
+        object-fit: cover;
+      }
+      .video-crop .tag-live {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        font-size: 10px;
+        letter-spacing: .08em;
+        color: var(--accent);
+        background: #101319cc;
+        padding: 4px 8px;
+        border-radius: 4px;
+      }
+      .video-meta {
+        padding: 12px 16px;
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        justify-content: space-between;
+      }
+      .video-controls-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px 16px 14px;
+      }
+      .video-controls-bar button {
+        font: inherit;
+        font-size: 11px;
+        background: #232b36;
+        border: 1px solid #3c4552;
+        color: #edf0f5;
+        border-radius: 5px;
+        padding: 5px 8px;
+        cursor: pointer;
+      }
+      .video-controls-bar select {
+        background: #1d2530;
+        border: 1px solid #3c4552;
+        color: inherit;
+        border-radius: 5px;
+        padding: 4px 6px;
+        font-size: 11px;
+      }
+
+      /* ── Score column ── */
+      .score-column {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .score-header {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        margin-bottom: 4px;
+      }
+      .score-header span {
+        font-size: 13px;
+        font-weight: 400;
+        color: var(--muted);
+        margin-left: 8px;
+      }
+
+      /* ── Category row (green/red pill) ── */
+      .category {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        border-radius: 10px;
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        cursor: pointer;
+        transition: background .15s;
+      }
+      .category:hover { background: #1c2232; }
+      .category .indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        align-self: flex-start;
+        margin-top: 4px;
+      }
+      .category.good .indicator { background: var(--green); box-shadow: 0 0 6px #7ee78744; }
+      .category.improve .indicator { background: var(--red); box-shadow: 0 0 6px #f4706744; }
+      .category.limited .indicator { background: var(--yellow); box-shadow: 0 0 6px #d2a82544; }
+
+      .category .cat-body { flex: 1; min-width: 0; }
+      .category .cat-title {
+        font-size: 14px;
+        font-weight: 550;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .category .cat-title .badge {
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: .04em;
+        padding: 2px 7px;
+        border-radius: 4px;
+      }
+      .category.good .badge { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+      .category.improve .badge { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+      .category.limited .badge { background: var(--yellow-bg); color: var(--yellow); border: 1px solid var(--yellow-border); }
+
+      .category .cat-detail {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 3px;
+        line-height: 1.45;
+      }
+      .category .cat-cue {
+        font-size: 12px;
+        color: #c5d0df;
+        margin-top: 6px;
+        padding: 6px 10px;
+        background: #12171f;
+        border-radius: 6px;
+        border-left: 3px solid;
+      }
+      .category.good .cat-cue { border-color: var(--green); }
+      .category.improve .cat-cue { border-color: var(--red); }
+      .category.limited .cat-cue { border-color: var(--yellow); }
+
+      /* ── Section headers ── */
+      .section-title {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .1em;
+        color: #6b7a8e;
+        text-transform: uppercase;
+        padding: 0 2px;
+      }
+
+      /* ── Dashboard cards grid ── */
+      .dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+      }
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 10px;
+        padding: 18px 20px;
+      }
+      .card-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .06em;
+        color: #6b7a8e;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+      }
+      .card-value {
+        font-size: 28px;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+      }
+      .card-sub {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+
+      /* Stat bar inside cards */
+      .stat-bar {
+        height: 6px;
+        border-radius: 3px;
+        background: #252d3a;
+        margin-top: 12px;
+        overflow: hidden;
+      }
+      .stat-bar .fill {
+        height: 100%;
+        border-radius: 3px;
+        background: var(--accent);
+      }
+
+      /* Angle range card */
+      .angle-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #1e2738;
+        font-size: 13px;
+      }
+      .angle-row:last-child { border-bottom: none; }
+      .angle-row .label { color: var(--muted); }
+      .angle-row .value { font-weight: 550; font-variant-numeric: tabular-nums; }
+
+      /* Ball path mini chart */
+      .path-canvas {
+        width: 100%;
+        height: 80px;
+        background: #0c1018;
+        border-radius: 6px;
+        border: 1px solid #1e2738;
+        display: block;
+      }
+
+      /* ── Priorities section ── */
+      .priorities {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+      .priority-card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 10px;
+        padding: 18px 20px;
+        border-top: 3px solid;
+      }
+      .priority-card:nth-child(1) { border-top-color: var(--red); }
+      .priority-card:nth-child(2) { border-top-color: #f0883e; }
+      .priority-card:nth-child(3) { border-top-color: #d2a825; }
+      .priority-num {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted);
+        letter-spacing: .05em;
+        margin-bottom: 8px;
+      }
+      .priority-title {
+        font-size: 14px;
+        font-weight: 550;
+        margin-bottom: 6px;
+      }
+      .priority-drill {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      /* ── Floating chat bubble ── */
+      .chat-fab {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        height: 48px;
+        border-radius: 24px;
+        background: var(--accent);
+        color: #18200e;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 18px 0 14px;
+        font-size: 20px;
+        box-shadow: 0 4px 20px rgba(0,0,0,.4), 0 0 0 0 rgba(197,243,107,.3);
+        transition: transform .15s, box-shadow .15s, border-radius .15s;
+        z-index: 100;
+      }
+      .fab-label {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: -.01em;
+      }
+      .chat-fab:hover { transform: scale(1.04); box-shadow: 0 6px 28px rgba(0,0,0,.5), 0 0 0 6px rgba(197,243,107,.15); }
+      .chat-fab[data-open="true"] { background: #232b36; color: #edf0f5; border-radius: 24px; padding: 0 16px; }
+      .chat-fab[data-open="true"] .fab-label { display: none; }
+
+      /* ── Chat popup ── */
+      .chat-popup {
+        position: fixed;
+        bottom: 92px;
+        right: 24px;
+        width: 400px;
+        max-height: 520px;
+        background: #131820;
+        border: 1px solid var(--card-border);
+        border-radius: 14px;
+        display: none;
+        flex-direction: column;
+        z-index: 99;
+        box-shadow: 0 12px 48px rgba(0,0,0,.6);
+        overflow: hidden;
+      }
+      .chat-popup[data-open="true"] { display: flex; }
+      .chat-popup-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        border-bottom: 1px solid #252d3a;
+      }
+      .chat-popup-header h3 {
+        font-size: 15px;
+        font-weight: 550;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .chat-popup-header .tag {
+        font-size: 9px;
+        letter-spacing: .1em;
+        color: #96a4b5;
+        border: 1px solid #3b4552;
+        border-radius: 4px;
+        padding: 3px 5px;
+      }
+      .chat-popup-close {
+        background: none;
+        border: none;
+        color: #6b7a8e;
+        font-size: 18px;
+        cursor: pointer;
+        padding: 4px;
+        line-height: 1;
+      }
+      .chat-popup-close:hover { color: #edf0f5; }
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 14px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 200px;
+      }
+      .chat-msg {
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-size: 13px;
+        line-height: 1.55;
+        max-width: 88%;
+      }
+      .chat-msg.user {
+        background: #252e1e;
+        align-self: flex-end;
+        border-bottom-right-radius: 4px;
+      }
+      .chat-msg.coach {
+        background: #1a2030;
+        align-self: flex-start;
+        border-bottom-left-radius: 4px;
+      }
+      .chat-msg .msg-label {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--accent);
+        margin-bottom: 4px;
+        display: block;
+      }
+      .chat-msg.user .msg-label { color: #7ee787; }
+      .chat-popup-input {
+        padding: 12px 18px;
+        border-top: 1px solid #252d3a;
+        display: flex;
+        gap: 8px;
+      }
+      .chat-popup-input textarea {
+        flex: 1;
+        resize: none;
+        background: #10151b;
+        color: #eef3f7;
+        border: 1px solid #39434e;
+        border-radius: 8px;
+        padding: 10px;
+        font: inherit;
+        font-size: 13px;
+        min-height: 40px;
+        max-height: 80px;
+      }
+      .chat-popup-input button {
+        font: inherit;
+        font-size: 13px;
+        font-weight: 550;
+        background: var(--accent);
+        color: #18200e;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 14px;
+        cursor: pointer;
+        align-self: flex-end;
+      }
+      .chat-popup-hint {
+        font-size: 10px;
+        color: #4a5568;
+        padding: 0 18px 10px;
+      }
+
+      /* ── Divider ── */
+      .divider {
+        border: none;
+        border-top: 1px solid #252d3a;
+        margin: 0;
+      }
+
+      /* ── Collapsible pipeline data ── */
+      .data-toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: none;
+        border: 1px solid var(--card-border);
+        border-radius: 10px;
+        padding: 14px 18px;
+        color: #8b99ad;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: background .15s;
+      }
+      .data-toggle:hover { background: #161b24; }
+      .data-toggle .chevron {
+        transition: transform .2s;
+        font-size: 14px;
+        color: #6b7a8e;
+      }
+      .data-toggle[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+      .data-drawer {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows .25s ease;
+      }
+      .data-drawer[data-open="true"] {
+        grid-template-rows: 1fr;
+      }
+      .data-drawer-inner {
+        overflow: hidden;
+      }
+      .data-drawer .dashboard {
+        padding-top: 16px;
+      }
+
+      /* ── Drawer sub-section titles ── */
+      .drawer-section-title {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: .1em;
+        color: #6b7a8e;
+        text-transform: uppercase;
+        padding: 20px 2px 8px;
+      }
+      .drawer-section-title:first-child { padding-top: 16px; }
+
+      /* Card units helper */
+      .card-unit { font-size: 16px; color: var(--muted); }
+
+      /* Chain visualization */
+      .chain-steps {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      .chain-step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--card-border);
+        background: #12171f;
+        min-width: 60px;
+      }
+      .chain-step .step-num { font-size: 10px; color: var(--muted); }
+      .chain-step .step-label { font-size: 13px; font-weight: 550; margin: 2px 0; }
+      .chain-step .step-time { font-size: 10px; color: var(--muted); }
+      .good-step { border-color: var(--green-border); }
+      .good-step .step-label { color: var(--green); }
+      .warn-step { border-color: var(--yellow-border); }
+      .warn-step .step-label { color: var(--yellow); }
+      .bad-step { border-color: var(--red-border); }
+      .bad-step .step-label { color: var(--red); }
+      .chain-arrow { color: #4a5568; font-size: 16px; }
+
+      /* Placeholder cards */
+      .placeholder-card { opacity: .5; }
+      .placeholder-value { color: #4a5568; }
+
+      /* Limitations list */
+      .limits-list {
+        list-style: none;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .limits-list li {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.5;
+        padding-left: 16px;
+        position: relative;
+      }
+      .limits-list li::before {
+        content: '•';
+        position: absolute;
+        left: 0;
+        color: #4a5568;
+      }
+
+      /* Downloads row */
+      .downloads-row {
+        display: flex;
+        gap: 10px;
+        padding: 8px 0 16px;
+      }
+      .download-link {
+        font-size: 12px;
+        color: var(--accent);
+        text-decoration: none;
+        padding: 8px 14px;
+        border: 1px solid var(--card-border);
+        border-radius: 8px;
+        background: var(--card-bg);
+        transition: background .15s;
+      }
+      .download-link:hover { background: #1c2232; text-decoration: none; }
+
+      /* ── Release timeline ── */
+      .timeline-bar {
+        display: flex;
+        border-radius: 6px;
+        overflow: hidden;
+        height: 40px;
+        margin-top: 8px;
+      }
+      .tl-phase {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        min-width: 0;
+      }
+      .tl-label { font-size: 11px; font-weight: 600; color: #e7ebf0; }
+      .tl-time { font-size: 10px; color: rgba(255,255,255,.6); }
+      .tl-load { background: #1a3a2a; }
+      .tl-release { background: #3a2020; }
+      .tl-follow { background: #1a2a3a; }
+      .tl-markers {
+        position: relative;
+        height: 32px;
+        margin-top: 4px;
+      }
+      .tl-marker {
+        position: absolute;
+        top: 0;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .tl-marker::before {
+        content: '';
+        width: 1px;
+        height: 6px;
+        background: #4a5568;
+        margin-bottom: 2px;
+      }
+      .tl-marker-t { font-weight: 600; color: #c5d0df; }
+
+      /* ── Hero vertical divider ── */
+      .hero-divider {
+        width: 1px;
+        background: #252d3a;
+        align-self: stretch;
+      }
+
+      /* ── Summary category pills (lean) ── */
+      .category { padding: 10px 16px; cursor: default; }
+      .category:hover { background: var(--card-bg); }
+      .cat-summary { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+      /* ── Coaching breakdown cards ── */
+      .phase-card { display: flex; flex-direction: column; gap: 10px; }
+      .phase-header {
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .phase-detail { font-size: 12px; color: var(--muted); line-height: 1.5; }
+      .phase-cue {
+        font-size: 12px;
+        color: #c5d0df;
+        padding: 6px 10px;
+        background: #12171f;
+        border-radius: 6px;
+        border-left: 3px solid;
+      }
+      .good-cue { border-color: var(--green); }
+      .improve-cue { border-color: var(--red); }
+      .limited-cue { border-color: var(--yellow); }
+      .phase-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        border-top: 1px solid #1e2738;
+        padding-top: 8px;
+      }
+      .phase-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 8px;
+      }
+      .phase-stats > div {
+        display: flex;
+        flex-direction: column;
+        background: #12171f;
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-size: 12px;
+        border: none;
+      }
+      .phase-stats span { color: #5a6a7e; font-size: 10px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; margin-bottom: 3px; }
+      .phase-stats strong { font-size: 14px; font-weight: 550; font-variant-numeric: tabular-nums; color: #e7ebf0; }
+      /* ── Phase group header (spans full width) ── */
+      .phase-group-header {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        padding: 6px 0 0;
+      }
+      .phase-group-header .indicator {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      /* ── Sub-card (one per observation) ── */
+      .sub-card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 10px;
+        padding: 16px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .sub-card-title {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: .04em;
+        color: #e7ebf0;
+      }
+      .sub-card p {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.55;
+        margin: 0;
+      }
+      .sub-card .phase-stats {
+        margin-top: 4px;
+      }
+
+      /* ── Coaching tip card ── */
+      .coaching-tip-card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 10px;
+        padding: 14px 18px;
+        font-size: 12px;
+        color: #c5d0df;
+        line-height: 1.55;
+        border-left: 3px solid;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .coaching-tip-card .tip-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+      }
+      .coaching-tip-card.good-tip { border-color: var(--green); }
+      .coaching-tip-card.good-tip .tip-label { color: var(--green); }
+      .coaching-tip-card.improve-tip { border-color: var(--red); }
+      .coaching-tip-card.improve-tip .tip-label { color: var(--red); }
+      .coaching-tip-card.limited-tip { border-color: var(--yellow); }
+      .coaching-tip-card.limited-tip .tip-label { color: var(--yellow); }
+
+      /* ── Limits footer ── */
+      .limits-footer {
+        font-size: 12px;
+        color: #5a6a7e;
+        line-height: 1.55;
+        padding: 16px 20px;
+        background: #0d1017;
+        border: 1px solid #1e2738;
+        border-radius: 10px;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      .limits-icon {
+        font-size: 16px;
+        flex-shrink: 0;
+        margin-top: -1px;
+      }
+
+      /* ── Responsive ── */
+      @media (max-width: 900px) {
+        .hero { grid-template-columns: 1fr; }
+        .hero-divider { display: none; }
+        .video-panel { max-width: 400px; }
+        .priorities { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- Top bar -->
+    <div class="top-bar">
+      <a href="/">← Record a throw</a>
+      <select>
+        <option>Sep 16 2026, 2:34 PM · 4.2s</option>
+        <option>Sep 15 2026, 11:12 AM · 3.8s</option>
+      </select>
+      <a href="#">Original video ↗</a>
+    </div>
+
+    <div class="page">
+
+      <!-- Hero: video + score column -->
+      <div class="hero">
+
+        <!-- Smaller, cropped video -->
+        <div class="video-panel">
+          <div class="video-crop">
+            <div class="tag-live">PROCESSED</div>
+            <!-- Placeholder for cropped video -->
+            <div style="width:100%;height:100%;background:linear-gradient(135deg,#0a0f18 0%,#141c28 100%);display:grid;place-items:center;">
+              <div style="text-align:center;color:#3a4a5e">
+                <div style="font-size:48px;margin-bottom:8px">🏃</div>
+                <div style="font-size:12px">Cropped to wireframe region</div>
+              </div>
+            </div>
+          </div>
+          <div class="video-meta">
+            <span>4.2s · 126 frames · 30 fps</span>
+            <span>0:02.1 / 0:04.2</span>
+          </div>
+          <div class="video-controls-bar">
+            <button>⏪ 5s</button>
+            <button>‹</button>
+            <button>▶</button>
+            <button>›</button>
+            <button>5s ⏩</button>
+            <select>
+              <option>0.25×</option>
+              <option>0.5×</option>
+              <option selected>1×</option>
+              <option>1.5×</option>
+              <option>2×</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="hero-divider"></div>
+
+        <!-- Score column: categories with green/red -->
+        <div class="score-column">
+          <div class="score-header">Coaching Review <span>powered by Gemini 2.5 Flash</span></div>
+          <div class="section-title">Throw phases</div>
+
+          <div class="category good">
+            <div class="indicator"></div>
+            <div class="cat-body">
+              <div class="cat-title">Load Phase <span class="badge">Strong</span></div>
+              <div class="cat-summary">Good knee bend, wide stance, hip coil storing rotation</div>
+              <div class="cat-cue">Cue: "Sit into it" — focus on incorporating hips and trunk for more power.</div>
+            </div>
+          </div>
+          <div class="category improve">
+            <div class="indicator"></div>
+            <div class="cat-body">
+              <div class="cat-title">Release Phase <span class="badge">Needs work</span></div>
+              <div class="cat-summary">Elbow fires before hips — kinetic chain skips the trunk</div>
+              <div class="cat-cue">Cue: "Hips first, hand last" — integrate hip and trunk rotation to maximize elbow whip.</div>
+            </div>
+          </div>
+          <div class="category good">
+            <div class="indicator"></div>
+            <div class="cat-body">
+              <div class="cat-title">Follow-through <span class="badge">Strong</span></div>
+              <div class="cat-summary">Arm decelerates naturally, stable base on front foot</div>
+              <div class="cat-cue">Cue: Keep finishing with the arm across the body. Fluid deceleration prevents abrupt stops.</div>
+            </div>
+          </div>
+          <div class="category limited">
+            <div class="indicator"></div>
+            <div class="cat-body">
+              <div class="cat-title">Wrist Snap <span class="badge">Insufficient data</span></div>
+              <div class="cat-summary">Hands detected 42% — occluded during release</div>
+              <div class="cat-cue">Tip: Film from the side with the throwing hand facing the camera for better tracking.</div>
+            </div>
+          </div>
+          <div class="category limited">
+            <div class="indicator"></div>
+            <div class="cat-body">
+              <div class="cat-title">Consistency <span class="badge">Insufficient data</span></div>
+              <div class="cat-summary">Single throw — need 3–5 for comparison</div>
+              <div class="cat-cue">Tip: Record 3–5 throws in one session for meaningful consistency analysis.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Top 3 Priorities -->
+      <div class="section-title">Top 3 priorities</div>
+      <div class="priorities">
+        <div class="priority-card">
+          <div class="priority-num">#1 PRIORITY</div>
+          <div class="priority-title">Improve hip and trunk rotation</div>
+          <div class="priority-drill">No clear evidence of hip and trunk coil contributing to the throw. Drill: Medicine ball twists and throws to engage the core. Cue: "Twist and fire!"</div>
+        </div>
+        <div class="priority-card">
+          <div class="priority-num">#2 PRIORITY</div>
+          <div class="priority-title">Explosive leg drive in load</div>
+          <div class="priority-drill">Knees bend but a more explosive drive would add power. Drill: Jumping motions or lunges mimicking drive off the back leg. Cue: "Push the ground away!"</div>
+        </div>
+        <div class="priority-card">
+          <div class="priority-num">#3 PRIORITY</div>
+          <div class="priority-title">Hand-ball connection at release</div>
+          <div class="priority-drill">Wrist snap present but large hand-ball distance during early release. Drill: Towel throws emphasizing snap and extension. Cue: "Flick the towel!"</div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Coaching breakdown — full data cards -->
+      <div class="section-title">Coaching breakdown</div>
+      <div class="dashboard">
+
+        <!-- ═══ LOAD PHASE ═══ -->
+        <div class="phase-group-header"><span class="indicator" style="background:var(--green)"></span> Load Phase <span class="badge" style="background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);font-size:10px;padding:2px 6px;border-radius:4px">Strong</span></div>
+
+        <div class="sub-card">
+          <div class="sub-card-title">Legs &amp; base</div>
+          <p>Right knee begins bent at 0.06s, deepening through 0.36s to its lowest point. Left knee reaches deepest at 0.43s. Stance width and weight shift difficult to assess from single camera angle.</p>
+          <div class="phase-stats">
+            <div><span>R. knee deepest</span><strong>0.36s</strong></div>
+            <div><span>L. knee deepest</span><strong>0.43s</strong></div>
+          </div>
+        </div>
+
+        <div class="sub-card">
+          <div class="sub-card-title">Hip &amp; trunk coil</div>
+          <p>Insufficient data to clearly assess hip and trunk coil from this camera angle.</p>
+        </div>
+
+        <div class="sub-card">
+          <div class="sub-card-title">Arm draw-back</div>
+          <p>Right elbow begins at a wide angle at 0.06s, bending to peak at 0.36s. Ball drawn back to shoulder height, behind the head at peak load.</p>
+          <div class="phase-stats">
+            <div><span>R. elbow peak bend</span><strong>0.36s</strong></div>
+            <div><span>Ball at load</span><strong>Behind head</strong></div>
+            <div><span>Window</span><strong>0.06–0.43s</strong></div>
+          </div>
+        </div>
+
+        <div class="coaching-tip-card good-tip">
+          <div class="tip-label">Coaching note</div>
+          You achieve a good deep elbow bend and draw the ball back well. Focus on incorporating your hips and trunk to generate more power.
+        </div>
+
+        <div class="coaching-tip-card improve-tip">
+          <div class="tip-label">Drill — Medicine ball twists</div>
+          Practice rotational exercises like medicine ball twists and throws to engage the core. Cue: "Twist and fire!"
+        </div>
+
+        <!-- ═══ RELEASE PHASE ═══ -->
+        <div class="phase-group-header"><span class="indicator" style="background:var(--red)"></span> Release Phase <span class="badge" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);font-size:10px;padding:2px 6px;border-radius:4px">Needs work</span></div>
+
+        <div class="sub-card">
+          <div class="sub-card-title">Kinetic chain</div>
+          <p>Throw initiates with legs at 0.36s, followed by arm extension at 0.43s. Difficult to confirm a clear ground-up sequence without clearer hip and trunk rotation visibility.</p>
+          <div class="phase-stats">
+            <div><span>Leg initiation</span><strong>0.36s</strong></div>
+            <div><span>Arm extension</span><strong>0.43s</strong></div>
+          </div>
+        </div>
+
+        <div class="sub-card">
+          <div class="sub-card-title">Elbow whip</div>
+          <p>Right elbow extends from most bent position at 0.36s (11.6°) to nearly locked out by 2.43s (1.0°), indicating a strong whip-like action.</p>
+          <div class="phase-stats">
+            <div><span>R. elbow at load</span><strong>11.6°</strong></div>
+            <div><span>R. elbow at release</span><strong>1.0°</strong></div>
+          </div>
+        </div>
+
+        <div class="sub-card">
+          <div class="sub-card-title">Release point</div>
+          <p>Ball released around shoulder height with arm mostly extended, between 2.3s and 2.43s.</p>
+          <div class="phase-stats">
+            <div><span>Release height</span><strong>Shoulder</strong></div>
+            <div><span>Window</span><strong>2.3–2.43s</strong></div>
+          </div>
+        </div>
+
+        <div class="sub-card">
+          <div class="sub-card-title">Wrist snap</div>
+          <p>Wrist shows significant bend at 0.5s (projected bend -32.9°), further at 0.83s (-47.3°), indicating a good snap.</p>
+          <div class="phase-stats">
+            <div><span>Wrist at 0.5s</span><strong>-32.9°</strong></div>
+            <div><span>Wrist at 0.83s</span><strong>-47.3°</strong></div>
+          </div>
+        </div>
+
+        <div class="coaching-tip-card improve-tip">
+          <div class="tip-label">Coaching note</div>
+          The elbow whip is very powerful — great asset. Work on integrating strong hip and trunk rotation into the start of your release to maximize that power.
+        </div>
+
+        <div class="coaching-tip-card improve-tip">
+          <div class="tip-label">Drill — Jumping lunges</div>
+          Focus on jumping motions or lunges that mimic the drive off the back leg for more explosive leg drive. Cue: "Push the ground away!"
+        </div>
+
+        <div class="coaching-tip-card limited-tip">
+          <div class="tip-label">Drill — Towel flicks</div>
+          Practice throws with a towel to emphasize the feeling of snap and extension, focusing on late hand action. Cue: "Flick the towel!"
+        </div>
+
+        <!-- ═══ FOLLOW-THROUGH ═══ -->
+        <div class="phase-group-header"><span class="indicator" style="background:var(--green)"></span> Follow-through <span class="badge" style="background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);font-size:10px;padding:2px 6px;border-radius:4px">Strong</span></div>
+
+        <div class="sub-card">
+          <div class="sub-card-title">Arm deceleration</div>
+          <p>Arm continues to extend after release. Right elbow maintains extended position until 2.5s (74.1°) before re-bending naturally — good, fluid deceleration.</p>
+          <div class="phase-stats">
+            <div><span>R. elbow at 2.5s</span><strong>74.1°</strong></div>
+          </div>
+        </div>
+
+        <div class="sub-card">
+          <div class="sub-card-title">Balance</div>
+          <p>Balance appears stable throughout follow-through with no significant lateral movement.</p>
+          <div class="phase-stats">
+            <div><span>Balance</span><strong>Stable</strong></div>
+            <div><span>Lateral shift</span><strong>None</strong></div>
+          </div>
+        </div>
+
+        <div class="coaching-tip-card good-tip">
+          <div class="tip-label">Coaching note</div>
+          Your arm deceleration is fluid, preventing abrupt stops. Maintain this natural motion.
+        </div>
+
+        <!-- ═══ CONSISTENCY ═══ -->
+        <div class="phase-group-header"><span class="indicator" style="background:var(--yellow)"></span> Throw Consistency <span class="badge" style="background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-border);font-size:10px;padding:2px 6px;border-radius:4px">Insufficient data</span></div>
+
+        <div class="sub-card" style="grid-column: 1 / -1;">
+          <p>Only one throw present in this clip. Consistency cannot be assessed. Record 3–5 throws in a single session to compare release point, timing and mechanics.</p>
+          <div class="phase-stats">
+            <div><span>Throws</span><strong>1</strong></div>
+            <div><span>Needed</span><strong>3–5</strong></div>
+          </div>
+        </div>
+
+        <!-- ═══ TIMELINE ═══ -->
+        <div class="card phase-card" style="grid-column: 1 / -1;">
+          <div class="phase-header" style="color:var(--accent)"><span class="indicator" style="width:8px;height:8px;border-radius:50%;background:var(--accent)"></span> Release Timeline</div>
+          <div class="timeline-bar">
+            <div class="tl-phase tl-load" style="flex:0.43"><span class="tl-label">Load</span><span class="tl-time">0–0.43s</span></div>
+            <div class="tl-phase tl-release" style="flex:2.0"><span class="tl-label">Release</span><span class="tl-time">0.43–2.43s</span></div>
+            <div class="tl-phase tl-follow" style="flex:1.8"><span class="tl-label">Follow-through</span><span class="tl-time">2.43–4.2s</span></div>
+          </div>
+          <div class="tl-markers">
+            <div class="tl-marker" style="left:8.5%"><span>Peak load</span><span class="tl-marker-t">0.36s</span></div>
+            <div class="tl-marker" style="left:55%"><span>Ball release</span><span class="tl-marker-t">2.3s</span></div>
+            <div class="tl-marker" style="left:60%"><span>Max ext.</span><span class="tl-marker-t">2.5s</span></div>
+          </div>
+          <div class="phase-stats" style="margin-top:8px">
+            <div><span>Total duration</span><strong>4.2s</strong></div>
+            <div><span>Ball visible</span><strong>78%</strong></div>
+            <div><span>Body detected</span><strong>96%</strong></div>
+            <div><span>Hands detected</span><strong>42%</strong></div>
+          </div>
+        </div>
+
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Collapsible pipeline data (raw/technical) -->
+      <button class="data-toggle" id="data-toggle" aria-expanded="false" onclick="toggleData()">
+        Pipeline data
+        <span class="chevron">&#9662;</span>
+      </button>
+      <div class="data-drawer" id="data-drawer" data-open="false">
+        <div class="data-drawer-inner">
+
+          <div class="drawer-section-title" style="padding-top:16px">Capture</div>
+          <div class="dashboard">
+            <div class="card">
+              <div class="card-label">Duration</div>
+              <div class="card-value">4.2<span class="card-unit"> s</span></div>
+              <div class="card-sub">126 processed frames</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Processed FPS</div>
+              <div class="card-value">30.0</div>
+              <div class="card-sub">Camera requested 60 fps</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Source</div>
+              <div class="card-value" style="font-size:20px">Uploaded video</div>
+              <div class="card-sub">throw-sept16.mp4 · 1280 × 720</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Timestamp source</div>
+              <div class="card-value" style="font-size:16px">requestVideoFrameCallback</div>
+              <div class="card-sub">mediaTime · frame-accurate</div>
+            </div>
+          </div>
+
+          <div class="drawer-section-title">Detection rates</div>
+          <div class="dashboard">
+            <div class="card">
+              <div class="card-label">Ball visible</div>
+              <div class="card-value" style="color: var(--accent);">78%</div>
+              <div class="stat-bar"><div class="fill" style="width:78%"></div></div>
+              <div class="card-sub">98 of 126 frames</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Body detected</div>
+              <div class="card-value" style="color: var(--accent);">96%</div>
+              <div class="stat-bar"><div class="fill" style="width:96%"></div></div>
+              <div class="card-sub">121 of 126 frames</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Hands detected</div>
+              <div class="card-value" style="color: #d2a825;">42%</div>
+              <div class="stat-bar"><div class="fill" style="width:42%; background: #d2a825;"></div></div>
+              <div class="card-sub">53 of 126 frames</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Dominant hand</div>
+              <div class="card-value" style="font-size:20px">Right</div>
+              <div class="card-sub">Ball–wrist association</div>
+            </div>
+          </div>
+
+          <div class="drawer-section-title">Ball tracking</div>
+          <div class="dashboard">
+            <div class="card" style="grid-column: span 2;">
+              <div class="card-label">Ball trajectory · image plane</div>
+              <canvas class="path-canvas" id="path-demo" width="600" height="80"></canvas>
+              <div class="card-sub" style="margin-top:8px">Observed positions only · predictions excluded</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Tracking method</div>
+              <div class="card-value" style="font-size:14px">Colour segmentation + circle edges</div>
+              <div class="card-sub">HSV hue 0 · tolerance 14 · saturation 140</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Ball colour</div>
+              <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+                <div style="width:24px;height:24px;border-radius:50%;background:#ff5a62;border:2px solid #ff8a8f"></div>
+                <span style="font-size:16px;font-weight:550">Red</span>
+              </div>
+              <div class="card-sub" style="margin-top:8px">Masks: core + broad + shape + saturated</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Mean tracking score</div>
+              <div class="card-value">0.82</div>
+              <div class="stat-bar"><div class="fill" style="width:82%"></div></div>
+              <div class="card-sub">Heuristic · not probability</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Motion blur</div>
+              <div class="card-value" style="font-size:20px">8 frames</div>
+              <div class="card-sub">Near release window</div>
+            </div>
+          </div>
+
+          <div class="drawer-section-title">Not yet measured</div>
+          <div class="dashboard">
+            <div class="card placeholder-card">
+              <div class="card-label">Ball speed</div>
+              <div class="card-value placeholder-value">—</div>
+              <div class="card-sub">Requires calibration</div>
+            </div>
+            <div class="card placeholder-card">
+              <div class="card-label">Time to load</div>
+              <div class="card-value placeholder-value">—</div>
+              <div class="card-sub">Not implemented</div>
+            </div>
+            <div class="card placeholder-card">
+              <div class="card-label">Time to release</div>
+              <div class="card-value placeholder-value">—</div>
+              <div class="card-sub">Not implemented</div>
+            </div>
+            <div class="card placeholder-card">
+              <div class="card-label">Ball spin</div>
+              <div class="card-value placeholder-value">—</div>
+              <div class="card-sub">Cannot measure from 2D</div>
+            </div>
+          </div>
+
+          <div class="drawer-section-title">Limitations</div>
+          <div class="dashboard">
+            <div class="card" style="grid-column: span 3;">
+              <ul class="limits-list">
+                <li>No metric calibration — all measurements are pixel-based</li>
+                <li>Throw events are not automatically detected</li>
+                <li>Tracking score is heuristic, not a probability</li>
+                <li>Video records browser processing cadence, not high-speed acquisition</li>
+                <li>Ball tracking phases are association heuristics, not validated release events</li>
+                <li>Hand landmarks do not measure ball spin, grip force, or true 3D curvature</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="drawer-section-title">Downloads</div>
+          <div class="downloads-row">
+            <a class="download-link" href="#">Pipeline JSON</a>
+            <a class="download-link" href="#">Original video</a>
+            <a class="download-link" href="#">Processed video</a>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Analysis limits — bottom of page -->
+      <div class="limits-footer">
+        <span class="limits-icon">&#9432;</span>
+        The single uncalibrated 2D camera angle limits analysis of depth, specific weight transfer, and detailed hip/trunk rotation. Future capture could use multiple camera angles or 3D sensors for more comprehensive kinematic analysis.
+      </div>
+
+    </div>
+
+    <!-- Floating chat bubble -->
+    <button class="chat-fab" id="chat-fab" data-open="false" onclick="toggleChat()">
+      <span id="fab-icon">💬</span>
+      <span class="fab-label" id="fab-label">Coach chat</span>
+    </button>
+
+    <!-- Chat popup -->
+    <div class="chat-popup" id="chat-popup" data-open="false">
+      <div class="chat-popup-header">
+        <h3>Ask the coach <span class="tag">LLM</span></h3>
+        <button class="chat-popup-close" onclick="toggleChat()">✕</button>
+      </div>
+      <div class="chat-messages">
+        <div class="chat-msg coach">
+          <span class="msg-label">Coach</span>
+          Good session — your load phase is solid. The main thing holding you back is the kinetic chain order. Want to dig into any specific phase?
+        </div>
+        <div class="chat-msg user">
+          <span class="msg-label">You</span>
+          What exactly is wrong with my release timing?
+        </div>
+        <div class="chat-msg coach">
+          <span class="msg-label">Coach</span>
+          Your elbow starts extending at 1.7s but your trunk doesn't rotate until 1.9s. In a good throw, the trunk fires first to create the whip effect. Right now your arm is muscling the ball instead of transferring ground-up energy.
+        </div>
+      </div>
+      <div class="chat-popup-input">
+        <textarea rows="1" placeholder="What should I focus on next?"></textarea>
+        <button>Send</button>
+      </div>
+      <div class="chat-popup-hint">Videos stay local. Stats and landmarks are sent to Gemini.</div>
+    </div>
+
+    <script>
+      function toggleDrawer(btnId, drawerId) {
+        const btn = document.getElementById(btnId);
+        const drawer = document.getElementById(drawerId);
+        const open = drawer.dataset.open === 'true';
+        drawer.dataset.open = !open;
+        btn.setAttribute('aria-expanded', !open);
+      }
+      function toggleData() { toggleDrawer('data-toggle', 'data-drawer'); }
+      function toggleChat() {
+        const fab = document.getElementById('chat-fab');
+        const popup = document.getElementById('chat-popup');
+        const open = popup.dataset.open === 'true';
+        popup.dataset.open = !open;
+        fab.dataset.open = !open;
+        document.getElementById('fab-icon').textContent = open ? '💬' : '✕';
+      }
+    </script>
+
+    <!-- Fake trajectory drawing -->
+    <script>
+      const c = document.getElementById('path-demo');
+      const ctx = c.getContext('2d');
+      ctx.strokeStyle = '#c5f36b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const points = [];
+      for (let i = 0; i < 40; i++) {
+        const x = 30 + i * 13.5;
+        const y = 55 - Math.sin(i * 0.18) * 30 + Math.random() * 4;
+        points.push([x, y]);
+      }
+      points.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+      ctx.stroke();
+      ctx.fillStyle = '#c5f36b';
+      points.forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill(); });
+    </script>
+  </body>
+</html>
