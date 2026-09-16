@@ -1080,11 +1080,14 @@
         <div class="hero-divider"></div>
 
         <!-- Score column -->
-        <div class="score-column">
-          <div class="score-header">Coaching Review <span id="score-header-provider"></span></div>
-          <div class="section-title">Throw phases</div>
-          <div id="score-pills">
-            <!-- JS populates phase category pills here -->
+        <div class="score-column" id="score-column">
+          <div id="score-empty" style="color:var(--muted);font-size:14px;padding:20px 0">
+            Select a recording and generate coaching advice to see the analysis.
+          </div>
+          <div id="score-content" hidden>
+            <div class="score-header">Coaching Review <span id="score-header-provider"></span></div>
+            <div class="section-title">Throw phases</div>
+            <div id="score-pills"></div>
           </div>
         </div>
       </div>
@@ -1107,6 +1110,10 @@
         <!-- Coaching breakdown -->
         <div class="section-title">Coaching breakdown</div>
         <div id="coaching-breakdown" class="dashboard"></div>
+
+        <hr class="divider" />
+
+        <button id="regenerate-advice" class="generate-btn" style="width:100%">Regenerate coaching advice</button>
       </div>
 
       <hr class="divider" />

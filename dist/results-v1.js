@@ -32,10 +32,13 @@ function formatTime(s) {
 function parseAdvice(text) {
   const result = { overview: '', phases: [], priorities: [], limits: '' };
   const sections = [];
-  const headerRe = /^(\d+)\.\s+([A-Z][A-Z\s\d\-]+)$/gm;
+  // Match "TITLE:" or "1. TITLE" at start of line (all caps, with optional colon)
+  const headerRe = /^(?:\d+\.\s+)?([A-Z][A-Z\s\d\-]+?)\s*:?\s*$/gm;
   let m;
   while ((m = headerRe.exec(text)) !== null) {
-    sections.push({ num: +m[1], title: m[2].trim(), pos: m.index, len: m[0].length });
+    const title = m[1].trim();
+    if (title.length < 3 || title.length > 40) continue;
+    sections.push({ title, pos: m.index, len: m[0].length });
   }
   for (let i = 0; i < sections.length; i++) {
     const start = sections[i].pos + sections[i].len;
@@ -45,7 +48,7 @@ function parseAdvice(text) {
 
     if (title === 'OVERVIEW') {
       result.overview = body;
-    } else if (title.includes('TOP 3') || title.includes('PRIORITIES')) {
+    } else if (title.includes('PRIORITIES') || title.includes('TOP 3')) {
       result.priorities = parsePriorities(body);
     } else if (title === 'LIMITS') {
       result.limits = body;
@@ -70,6 +73,16 @@ function parsePhase(title, body) {
   if (noteMatch) {
     coachingNote = noteMatch[1].trim();
     body = body.substring(0, noteMatch.index).trim();
+  } else {
+    // Try extracting everything after the last sub-section as the coaching note
+    const lastSub = body.lastIndexOf('\n');
+    if (lastSub > 0) {
+      const tail = body.substring(lastSub).trim();
+      if (/^(Verdict|Drill|Cue):/i.test(tail)) {
+        coachingNote = tail;
+        body = body.substring(0, lastSub).trim();
+      }
+    }
   }
 
   const subs = [];
@@ -99,8 +112,24 @@ function parsePhase(title, body) {
 }
 
 function parsePriorities(body) {
-  const items = body.split(/\n(?=\d+\.\s)/).filter(Boolean);
+  // Split on "Priority:" lines or numbered items
+  const items = body.split(/\n(?=Priority:|(?:\d+\.\s))/i).filter(Boolean);
   return items.map((item) => {
+    // New format: Priority: / Issue: / Drill: / Cue:
+    const titleMatch = item.match(/Priority:\s*(.+)/i);
+    const issueMatch = item.match(/Issue:\s*(.+)/i);
+    const drillMatch = item.match(/Drill:\s*(.+)/i);
+    const cueMatch = item.match(/Cue:\s*(.+)/i);
+
+    if (titleMatch) {
+      let detail = '';
+      if (issueMatch) detail += issueMatch[1].trim();
+      if (drillMatch) detail += (detail ? ' ' : '') + 'Drill: ' + drillMatch[1].trim();
+      if (cueMatch) detail += (detail ? ' ' : '') + 'Cue: ' + cueMatch[1].trim();
+      return { title: titleMatch[1].trim(), detail };
+    }
+
+    // Fallback: old "1. Title: detail" format
     const m = item.match(/^\d+\.\s+([\s\S]*)/);
     if (!m) return { title: item.trim(), detail: '' };
     const full = m[1].trim();
@@ -114,10 +143,21 @@ function parsePriorities(body) {
 
 function detectStatus(note, body) {
   const text = (note + ' ' + body).toLowerCase();
-  if (/insufficient|cannot be assessed|only one|cannot assess|no clear/.test(text))
+
+  // Explicit verdict from LLM
+  const verdictMatch = text.match(/verdict:\s*(strong|needs?\s*work|insufficient\s*data)/i);
+  if (verdictMatch) {
+    const v = verdictMatch[1].toLowerCase();
+    if (v.includes('insufficient')) return 'limited';
+    if (v.includes('need')) return 'improve';
+    return 'good';
+  }
+
+  // Fallback heuristic — biased toward critical
+  if (/insufficient|cannot be assessed|only one|cannot assess|no clear|sparse/.test(text))
     return 'limited';
   if (
-    /needs? work|improve|issue|problem|not enough|limited|abrupt|less|missing|not smooth|not consistently/.test(
+    /needs? work|improve|issue|problem|not enough|limited|abrupt|missing|not smooth|not consistently|minimal|poor|lacking|weak|no (?:clear|meaningful|significant)|arm.dominant|upper.body.dominant|doesn.t|does not|isn.t|little|stiff|early|late|skip/.test(
       text,
     )
   )
@@ -149,6 +189,23 @@ function extractStats(text) {
     }
   }
   return stats;
+}
+
+function parseCoachingNote(text) {
+  let note = text,
+    drill = '',
+    cue = '';
+  const drillMatch = text.match(/Drill:\s*(.*?)(?=\s*Cue:|$)/is);
+  if (drillMatch) drill = drillMatch[1].trim();
+  const cueMatch = text.match(/Cue:\s*(.*?)$/is);
+  if (cueMatch) cue = cueMatch[1].trim().replace(/^[""]|[""]$/g, '');
+  if (drill || cue) {
+    note = text
+      .replace(/\s*Drill:[\s\S]*$/, '')
+      .replace(/\s*Cue:[\s\S]*$/, '')
+      .trim();
+  }
+  return { note, drill, cue };
 }
 
 // ── Rendering ──
@@ -242,16 +299,85 @@ function renderBreakdown(advice) {
           : phase.status === 'improve'
             ? 'improve-tip'
             : 'limited-tip';
-      c.innerHTML +=
-        `<div class="coaching-tip-card ${tipCls}">` +
-        `<div class="tip-label">Coaching note</div>` +
-        `${esc(phase.coachingNote)}</div>`;
+      const parts = parseCoachingNote(phase.coachingNote);
+      if (parts.note) {
+        c.innerHTML +=
+          `<div class="coaching-tip-card ${tipCls}">` +
+          `<div class="tip-label">Coaching note</div>` +
+          `${esc(parts.note)}</div>`;
+      }
+      if (parts.drill) {
+        c.innerHTML +=
+          `<div class="coaching-tip-card ${tipCls}">` +
+          `<div class="tip-label">Drill</div>` +
+          `${esc(parts.drill)}</div>`;
+      }
+      if (parts.cue) {
+        c.innerHTML +=
+          `<div class="coaching-tip-card ${tipCls}">` +
+          `<div class="tip-label">Cue</div>` +
+          `${esc(parts.cue)}</div>`;
+      }
     }
   }
+
+  const duration = current?.metrics?.duration_s;
+  const timeline = renderTimeline(advice.phases, duration);
+  if (timeline) c.innerHTML += timeline;
+}
+
+function renderTimeline(phases, duration) {
+  if (!duration || phases.length < 2) return '';
+  const timesByPhase = [];
+  for (const phase of phases) {
+    const allText = phase.subs.map((s) => s.text).join(' ') + ' ' + phase.coachingNote;
+    const times = [];
+    for (const m of allText.matchAll(/(?:at|by|around)\s+(\d+\.?\d*)\s*s/g)) {
+      times.push(+m[1]);
+    }
+    if (times.length) {
+      timesByPhase.push({
+        title: phase.title,
+        min: Math.min(...times),
+        max: Math.max(...times),
+        status: phase.status,
+      });
+    }
+  }
+  if (timesByPhase.length < 2) return '';
+
+  let html =
+    `<div class="card phase-card" style="grid-column:1/-1">` +
+    `<div class="phase-header" style="color:var(--accent)"><span class="indicator" style="width:8px;height:8px;border-radius:50%;background:var(--accent)"></span> Release Timeline</div>` +
+    `<div class="timeline-bar">`;
+  for (const p of timesByPhase) {
+    const dur = Math.max(0.1, p.max - p.min);
+    const cls = p.title.toLowerCase().includes('load')
+      ? 'tl-load'
+      : p.title.toLowerCase().includes('release')
+        ? 'tl-release'
+        : 'tl-follow';
+    html += `<div class="tl-phase ${cls}" style="flex:${dur.toFixed(1)}"><span class="tl-label">${esc(p.title.replace(' PHASE', ''))}</span><span class="tl-time">${dur.toFixed(1)}s</span></div>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="phase-stats" style="margin-top:8px">`;
+  html += `<div><span>Total duration</span><strong>${duration.toFixed(1)}s</strong></div>`;
+  for (const p of timesByPhase) {
+    const dur = (p.max - p.min).toFixed(1);
+    html += `<div><span>${esc(p.title.replace(' PHASE', ''))}</span><strong>${dur}s</strong></div>`;
+  }
+  for (const p of timesByPhase) {
+    html += `<div><span>${esc(p.title.replace(' PHASE', ''))} window</span><strong>${p.min.toFixed(1)}–${p.max.toFixed(1)}s</strong></div>`;
+  }
+  html += `</div></div>`;
+  return html;
 }
 
 function renderAdvice(text, provider, model) {
   const advice = parseAdvice(text);
+  $('score-empty').hidden = true;
+  $('score-content').hidden = false;
   $('score-header-provider').textContent = `powered by ${provider} ${model}`;
   renderScorePills(advice.phases);
   renderPriorities(advice.priorities);
@@ -316,6 +442,50 @@ function renderPipeline(record) {
   html += barCard('Body detected', pct(pf), pf, `${Math.round(pf * frames)} of ${frames} frames`);
   html += barCard('Hands detected', pct(hf), hf, `${Math.round(hf * frames)} of ${frames} frames`);
   html += card('Dominant hand', dominantHand(samples), 'Ball–wrist association');
+  html += '</div>';
+
+  html += section('Hip-shoulder separation & rotation');
+  html += '<div class="dashboard">';
+  const sep = m.projected_angles_deg?.hip_shoulder_separation_deg;
+  html += card(
+    'Hip-shoulder separation',
+    sep ? `${Math.round(sep.min)}° to ${Math.round(sep.max)}°` : '—',
+    sep
+      ? `Peak separation ${Math.round(Math.max(Math.abs(sep.min), Math.abs(sep.max)))}° · ${sep.observations} frames`
+      : 'No data',
+  );
+  const shoulderVel = m.shoulder_rotation_velocity_deg_s;
+  html += card(
+    'Torso rotation velocity',
+    shoulderVel ? `${Math.round(shoulderVel.peak)}°/s` : '—',
+    shoulderVel ? `Peak · mean ${Math.round(shoulderVel.mean)}°/s` : 'No data',
+  );
+  const hipVel = m.hip_rotation_velocity_deg_s;
+  html += card(
+    'Pelvic rotation velocity',
+    hipVel ? `${Math.round(hipVel.peak)}°/s` : '—',
+    hipVel ? `Peak · mean ${Math.round(hipVel.mean)}°/s` : 'No data',
+  );
+  const shoulderLine = m.projected_angles_deg?.shoulder_line_deg;
+  const hipLine = m.projected_angles_deg?.hip_line_deg;
+  html += card(
+    'Shoulder line range',
+    shoulderLine ? `${Math.round(shoulderLine.min)}° to ${Math.round(shoulderLine.max)}°` : '—',
+    shoulderLine ? `${shoulderLine.observations} frames` : 'No data',
+  );
+  html += card(
+    'Hip line range',
+    hipLine ? `${Math.round(hipLine.min)}° to ${Math.round(hipLine.max)}°` : '—',
+    hipLine ? `${hipLine.observations} frames` : 'No data',
+  );
+  if (hipVel && shoulderVel) {
+    const leads = hipVel.peak > shoulderVel.peak ? 'Pelvis leads' : 'Torso leads';
+    html += card(
+      'Rotation sequence',
+      leads,
+      `Pelvis peak ${Math.round(hipVel.peak)}°/s · Torso peak ${Math.round(shoulderVel.peak)}°/s`,
+    );
+  }
   html += '</div>';
 
   html += section('Ball tracking');
@@ -451,7 +621,11 @@ function renderChat(chat) {
 function cropVideoToWireframe(samples) {
   const v = $('result-video');
   if (!v) return;
-  let minX = 1, maxX = 0, minY = 1, maxY = 0, count = 0;
+  let minX = 1,
+    maxX = 0,
+    minY = 1,
+    maxY = 0,
+    count = 0;
   for (const s of samples) {
     if (!s.pose) continue;
     for (let i = 11; i < s.pose.length; i++) {
@@ -486,6 +660,9 @@ function cropVideoToWireframe(samples) {
 async function show(id) {
   const token = ++loadToken;
   current = null;
+  $('score-empty').hidden = false;
+  $('score-content').hidden = true;
+  $('score-pills').innerHTML = '';
   try {
     const record = await api('/api/results/' + encodeURIComponent(id));
     if (token !== loadToken) return;
@@ -639,6 +816,28 @@ $('generate-advice').onclick = async () => {
     $('generate-advice').textContent = e.message;
   } finally {
     busy = false;
+  }
+};
+
+$('regenerate-advice').onclick = async () => {
+  if (!current || busy || !available) return;
+  busy = true;
+  $('regenerate-advice').disabled = true;
+  $('regenerate-advice').textContent = 'Regenerating…';
+  try {
+    const advice = await api(`/api/results/${current.id}/advice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ regenerate: true }),
+    });
+    current.advice = advice;
+    await show(current.id);
+  } catch (e) {
+    $('regenerate-advice').textContent = e.message;
+  } finally {
+    busy = false;
+    $('regenerate-advice').disabled = false;
+    $('regenerate-advice').textContent = 'Regenerate coaching advice';
   }
 };
 
