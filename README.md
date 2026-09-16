@@ -5,6 +5,14 @@ Goal: POC into how good a generalised LLM can respond to kinetic data from wire 
 
 A local camera app with a full-height 75% video / 25% sidebar layout. The sidebar is split equally between stats/ball colour and advice. A separate Results page loads saved recordings.
 
+## The Vision
+<img width="1201" height="572" alt="image" src="https://github.com/user-attachments/assets/4d65a9a1-2e55-48e7-ac46-fc2f725c7e5b" />
+
+
+## The overview on the CV pipeline
+<img width="904" height="425" alt="image" src="https://github.com/user-attachments/assets/4f539644-e46b-445a-8ede-99558ea9ff08" />
+
+
 ## Run
 
 Run `npm start` (Python 3.9+ and Node for npm scripts; no package installation needed), then open http://127.0.0.1:8765. Chrome or Edge is recommended. Enable the camera, choose the ball colour, wait for all three pipelines, then Start / Stop.
