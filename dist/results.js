@@ -44,6 +44,7 @@ async function show(id) {
     $('json-link').href=`/results/${id}/data.json`; $('json-link').download=`throw-${id}.json`;
     $('trajectory').hidden=false; $('result-stats').replaceChildren();
     const m=record.metrics;
+    if(record.report.throw_detection){stat('Throws',record.report.throw_detection.segments.length);stat('Original duration',`${record.report.capture.original_duration_s.toFixed(1)} s`);}
     stat('Duration',`${m.duration_s.toFixed(1)} s`);stat('Processed FPS',m.processed_fps?.toFixed(1)??'—');stat('Ball visible',percent(m.ball_detection_fraction));stat('Body detected',percent(m.pose_detection_fraction));
     stat('Hands detected',percent(m.hand_detection_fraction));
     stat('Left elbow · 2D',range(m.projected_angles_deg?.left_elbow_deg));stat('Right elbow · 2D',range(m.projected_angles_deg?.right_elbow_deg));
@@ -51,7 +52,7 @@ async function show(id) {
     ctx.clearRect(0,0,canvas.width,canvas.height);ctx.strokeStyle='#c5f36b';ctx.lineWidth=2;
     const scale=Math.min((canvas.width-20)/dim.width,(canvas.height-20)/dim.height),ox=(canvas.width-dim.width*scale)/2,oy=(canvas.height-dim.height*scale)/2;
     let previous=null;
-    for(const s of record.report.samples){if(!s.ball){previous=null;continue;}const x=ox+s.ball.x_px*scale,y=oy+s.ball.y_px*scale;ctx.beginPath();if(previous&&s.t_s-previous.t<.12&&previous.track_id===s.ball.track_id){ctx.moveTo(previous.x,previous.y);ctx.lineTo(x,y);ctx.stroke();}else{ctx.fillStyle='#c5f36b';ctx.arc(x,y,2,0,2*Math.PI);ctx.fill();}previous={x,y,t:s.t_s,track_id:s.ball.track_id};}
+    for(const s of record.report.samples){if(!s.ball){previous=null;continue;}const x=ox+s.ball.x_px*scale,y=oy+s.ball.y_px*scale;ctx.beginPath();if(previous&&s.t_s-previous.t<.12&&previous.track_id===s.ball.track_id&&previous.throw_id===s.throw_id){ctx.moveTo(previous.x,previous.y);ctx.lineTo(x,y);ctx.stroke();}else{ctx.fillStyle='#c5f36b';ctx.arc(x,y,2,0,2*Math.PI);ctx.fill();}previous={x,y,t:s.t_s,track_id:s.ball.track_id,throw_id:s.throw_id};}
     $('advice').textContent=record.advice?.text || (available?'Ready to review this recording.':'LLM not connected. Add a GEMINI_API_KEY or OPENAI_API_KEY to .env and restart the server.');
     $('generate-advice').disabled=!available||!!record.advice; $('generate-advice').textContent=record.advice?'Advice saved':'Get coaching advice';
   }catch(e){if(token!==loadToken)return;$('library-message').textContent=e.message;$('empty-library').hidden=false;$('result-video').hidden=true;$('advice').textContent=e.message;}
