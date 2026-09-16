@@ -7,8 +7,9 @@ const $ = id => document.getElementById(id);
 const video = $('source'), canvas = $('output'), ctx = canvas.getContext('2d');
 const small = document.createElement('canvas'), sctx = small.getContext('2d', {willReadFrequently:true});
 const rawFrame=document.createElement('canvas'), rawContext=rawFrame.getContext('2d');
+const isolatedFrame=document.createElement('canvas');
 let tracker, poseTracker, handTracker, stream, ready = false, opening = false, recording = null, picking = false, pendingSave = null;
-let config = {colour:'red', hue:0, tolerance:14, saturation:85};
+let config = {colour:'red', hue:0, tolerance:14, saturation:140, isolate:false};
 let trail = [], latestTime = 0, lastFrame = -1, lastWall = 0, fps = 0, urls = [], finalizing = false;
 
 function error(message) { $('error').textContent = message; $('error').hidden = !message; }
@@ -18,7 +19,7 @@ function controls() {
   $('stop').disabled = !recording;
   $('enable').disabled = opening;
   $('sample').disabled = !stream || !ready || active;
-  document.querySelectorAll('#colours input, input[type=range]').forEach(e => e.disabled = active);
+  document.querySelectorAll('#colours input, input[type=range], #isolate').forEach(e => e.disabled = active);
 }
 async function loadTracker() {
   try {
@@ -94,9 +95,10 @@ function frame(now, metadata) {
   let ball = null, pose = null, hands = [];
   if (ready) {
     try {
-      ball = tracker.detect(small, t, config);
       pose = poseTracker.detectForVideo(small, now).landmarks[0] ?? null;
       hands = handFeatures(collectHands(handTracker.detectForVideo(rawFrame,now)),pose,canvas.width,canvas.height);
+      ball = tracker.detect(small, t, config, {hands, pose, isolationCanvas:config.isolate?isolatedFrame:null});
+      if(config.isolate)ctx.drawImage(isolatedFrame,0,0,canvas.width,canvas.height);
     } catch(e) {ready = false; stopRecording(); error('A processing pipeline failed. Reload the page to reset it.'); controls();}
   }
   drawPose(ctx, pose, canvas.width, canvas.height);
@@ -106,7 +108,7 @@ function frame(now, metadata) {
   if (ball) {
     const scale = canvas.width / small.width;
     ball = {...ball, x:ball.x * scale, y:ball.y * scale, radius:ball.radius * scale};
-    if (trail.length && t - trail[trail.length - 1].t > .12) trail = [];
+    if (trail.length && (t - trail[trail.length - 1].t > .12 || trail[trail.length - 1].track_id !== ball.track_id)) trail = [];
     trail.push(ball);
   }
   trail = trail.filter(p => t - p.t < .8);
@@ -116,13 +118,22 @@ function frame(now, metadata) {
     ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius + 5, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = '#c5f36b'; ctx.beginPath(); ctx.arc(ball.x, ball.y, 3, 0, Math.PI * 2); ctx.fill();
   }
-  $('ball-state').textContent = ball ? 'Detected' : ready ? 'Not visible' : 'Waiting';
+  const ballStatus=tracker?.status;
+  const prediction=ballStatus?.prediction;
+  if (prediction && ready) {
+    const scale=canvas.width/small.width;
+    ctx.save(); ctx.strokeStyle='#d9a65c'; ctx.setLineDash([6,6]);
+    ctx.beginPath(); ctx.arc(prediction.x*scale,prediction.y*scale,prediction.radius*scale+5,0,Math.PI*2);ctx.stroke();ctx.restore();
+  }
+  const phaseLabels={near_hand:'Near hand',flight:'In flight',unassociated:'Detected'};
+  $('ball-state').textContent = ball ? phaseLabels[ball.tracking_phase] : ready ? prediction?'Predicted briefly':'Not visible' : 'Waiting';
   $('score').textContent = ball ? ball.score.toFixed(2) : '—'; $('fps').textContent = fps ? Math.round(fps) : '—';
   if (recording) {
     const r = recording;
     if (r.origin === null) r.origin = t;
     const elapsed = t - r.origin;
-    r.samples.push({frame_index:r.samples.length, t_s:+elapsed.toFixed(6), source_media_time_s:t, presented_frame:metadata.presentedFrames ?? null, ball:ball ? {x_px:+ball.x.toFixed(2),y_px:+ball.y.toFixed(2),radius_px:+ball.radius.toFixed(2),tracking_score:+ball.score.toFixed(3),observed:true} : null,pose:pose?.map(p=>({x:p.x,y:p.y,z:p.z,visibility:p.visibility,presence:p.presence}))??null,features_2d:poseFeatures(pose,canvas.width,canvas.height),hands});
+    const detectorScale=canvas.width/small.width;
+    r.samples.push({frame_index:r.samples.length, t_s:+elapsed.toFixed(6), source_media_time_s:t, presented_frame:metadata.presentedFrames ?? null, ball:ball ? {x_px:+ball.x.toFixed(2),y_px:+ball.y.toFixed(2),radius_px:+ball.radius.toFixed(2),tracking_score:+ball.score.toFixed(3),observed:true,track_id:ball.track_id,tracking_phase:ball.tracking_phase,hand_distance_px:ball.hand_distance_px===null?null:+(ball.hand_distance_px*detectorScale).toFixed(2),hand_source:ball.hand_source,hand_side:ball.hand_side,motion_blur_candidate:ball.blurred,colour_mask_source:ball.mask_source} : null,ball_tracking:{state:ballStatus?.state??'searching',phase:ballStatus?.phase??'searching',phase_is_heuristic:true,track_id:ballStatus?.track_id??null},ball_prediction:prediction?{x_px:prediction.x*detectorScale,y_px:prediction.y*detectorScale,radius_px:prediction.radius*detectorScale,age_s:prediction.age_s,observed:false}:null,pose:pose?.map(p=>({x:p.x,y:p.y,z:p.z,visibility:p.visibility,presence:p.presence}))??null,features_2d:poseFeatures(pose,canvas.width,canvas.height),hands});
     const label = `${Math.floor(elapsed / 60).toString().padStart(2,'0')}:${(elapsed % 60).toFixed(1).padStart(4,'0')}`;
     $('elapsed').textContent = label;
     const size = Math.max(16, Math.round(canvas.width / 55));
@@ -146,7 +157,8 @@ function startRecording() {
   let r;
   try {
     if (!window.MediaRecorder || !canvas.captureStream) throw new Error('Recording is unavailable in this browser. Try a current Chrome, Edge or Safari browser.');
-    tracker.reset(); trail = [];
+    // Keep the established ball identity when recording starts.
+    trail = [];
     const processedStream = canvas.captureStream(0);
     if (!processedStream.getVideoTracks()[0].requestFrame) {
       processedStream.getTracks().forEach(t => t.stop());
@@ -179,6 +191,12 @@ async function stopRecording() {
     const duration = r.samples.at(-1).t_s;
     const report = {schema_version:'0.2',created_at:new Date().toISOString(),measurement_mode:'single_camera_uncalibrated',coordinate_system:{origin:'top_left',x:'right',y:'down',unit:'pixel',width:canvas.width,height:canvas.height},capture:{requested_fps:60,reported_camera_fps:r.settings.frameRate??null,processed_frames:r.samples.length,duration_s:duration,timestamp_source:video.requestVideoFrameCallback?'requestVideoFrameCallback.mediaTime':'video.currentTime',recording_frame_alignment:'t_s=0 is first processed frame after record start; recorder startup offset is not calibrated'},tracking:{method:'opencv_hsv_contours',...r.config,score_is_probability:false,detection_fraction:detected/r.samples.length},body_pipeline:{model:'mediapipe_pose_landmarker_lite',version:'0.10.21',landmark_names:LANDMARK_NAMES,xy_units:'normalized_image_width_and_height',z_units:'model_relative_depth_not_calibrated',joint_angles:'projected_2d_degrees',visibility_threshold_for_angles:0.6},limitations:['No metric calibration','Throw events are not implemented','Tracking score is heuristic','Video records browser processing cadence, not high-speed camera acquisition','Original and processed recorder start times may differ slightly'],samples:r.samples};
     report.metrics = summarize(report);
+    report.tracking.association='hand_assisted_motion_prediction_v1';
+    report.tracking.prediction_horizon_s=.2;
+    report.tracking.identity_timeout_s=.5;
+    report.tracking.phase_is_heuristic=true;
+    report.tracking.colour_masks={acquisition:'colour_core_or_wide_colour_round_shape',shape_hue_tolerance:Math.min(40,r.config.tolerance*1.5),shape_min_circularity:.7,shape_min_circle_fill:.72,max_frame_area_fraction:.25,core_hue_tolerance:Math.max(3,r.config.tolerance*.55),core_min_saturation:Math.min(255,r.config.saturation+30),tracking:'core_broad_and_shape'};
+    report.limitations.push('Ball tracking phases are association heuristics, not validated release events; dashed predictions are excluded from measured ball positions');
     report.hands_pipeline={model:'mediapipe_hand_landmarker',version:'0.10.21',landmark_names:HAND_NAMES,xy_units:'normalized_image_width_and_height',z_units:'model_relative_depth_not_calibrated',handedness_score_is_landmark_confidence:false,association:'nearest_visible_pose_wrist_one_to_one_with_distance_gate',features:'projected_2d_degrees; wrist bend is signed forearm-to-middle-MCP direction, not anatomical flexion',frame_orientation:'unmirrored'};
     report.limitations.push('Hand landmarks do not measure ball spin, grip force, or true 3D curvature','Small or occluded hands may be missed; handedness score is classification confidence only');
     const stamp = new Date().toISOString().replace(/[:.]/g,'-');
@@ -194,7 +212,7 @@ async function stopRecording() {
     pendingSave = {report,processedBlob,rawBlob};
     await saveResult();
   } else {error('No usable frames were recorded. Try a longer recording.'); $('status').textContent = 'Ready to retry';}
-  controls();
+  controls();c
 }
 async function saveResult() {
   if (!pendingSave) return;
@@ -212,6 +230,7 @@ async function saveResult() {
   finally {finalizing=false; controls();}
 }
 $('retry-save').onclick=saveResult;
+$('isolate').onchange=()=>{config.isolate=$('isolate').checked;};
 $('enable').onclick = enableCamera; $('start').onclick = startRecording; $('stop').onclick = stopRecording;
 document.querySelectorAll('[name=colour]').forEach(input => input.onchange = () => {
   config.colour=input.value; config.hue=PRESETS[input.value]; tracker?.reset(); trail=[];
@@ -234,7 +253,7 @@ canvas.onclick = e => {
   let h = max===r ? ((g-b)/d)%6 : max===g ? (b-r)/d+2 : (r-g)/d+4;
   config.hue=Math.round(((h*60+360)%360)/2)%180; config.colour='sampled';
   document.querySelectorAll('[name=colour]').forEach(i=>i.checked=false);
-  picking=false; canvas.parentElement.classList.remove('sampling'); tracker.reset(); trail=[];
+  picking=false; canvas.parentElement.classList.remove('sampling'); tracker.seed(x/canvas.width,y/canvas.height,latestTime); trail=[];
   $('sample-hint').textContent='Sampled colour active. Adjust tolerance if needed.';
 };
 document.addEventListener('visibilitychange',() => {if (document.hidden && recording) {stopRecording(); error('Recording stopped because the page was hidden. Keep this tab visible while recording.');}});

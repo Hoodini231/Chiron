@@ -1,4 +1,44 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dodgeball · Results</title><link rel="stylesheet" href="style.css"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23c5f36b'/%3E%3C/svg%3E"><script type="module" src="results.js"></script></head><body><main class="layout">
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dodgeball · Results</title><link rel="stylesheet" href="style.css"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23c5f36b'/%3E%3C/svg%3E"><script type="module" src="results.js"></script></head><body><main class="layout" id="layout">
 <section class="video-pane results-pane"><video id="result-video" controls playsinline hidden></video><div class="result-nav"><a href="/">← Record a throw</a><a id="original-link" hidden>Original video ↗</a></div><div id="empty-library" class="empty-library"><h1>Saved results</h1><p id="library-message">Loading recordings…</p><a href="/">Record a throw</a></div></section>
-<aside class="sidebar"><section class="half"><h2>Stats <span class="tag">RESULT</span></h2><label for="recording-list" class="hint">Recording</label><select id="recording-list" disabled><option>No recordings yet</option></select><div id="result-stats" class="stats"></div><div id="trajectory" hidden><span class="chart-label">Observed ball path · image plane</span><canvas id="path-chart" class="chart" width="500" height="160"></canvas><p class="metric-note">Joint-angle ranges cover the whole clip. Speed and load/release timing are not yet measured.</p><a id="json-link" class="hint">Download pipeline JSON</a></div></section>
-<section class="half advice-panel"><h2>Advice <span class="tag">LLM</span></h2><button id="generate-advice" class="primary" disabled>Get coaching advice</button><div id="advice" role="status" aria-live="polite">Choose a saved result.</div><p id="llm-status" class="hint bottom-note">Advice uses measured stats and timestamped pose/ball samples. Videos stay local.</p></section></aside></main></body></html>
+<div class="gutter gutter-col" id="gutter-col"></div>
+<aside class="sidebar" id="sidebar"><section class="half" id="stats-half"><h2>Stats <span class="tag">RESULT</span></h2><label for="recording-list" class="hint">Recording</label><select id="recording-list" disabled><option>No recordings yet</option></select><div id="result-stats" class="stats"></div><div id="trajectory" hidden><span class="chart-label">Observed ball path · image plane</span><canvas id="path-chart" class="chart" width="500" height="160"></canvas><p class="metric-note">Joint-angle ranges cover the whole clip. Speed and load/release timing are not yet measured.</p><a id="json-link" class="hint">Download pipeline JSON</a></div></section>
+<div class="gutter gutter-row" id="gutter-row"></div>
+<section class="half advice-panel chat-panel" id="chat-half"><h2>Advice <span class="tag">LLM</span></h2><button id="generate-advice" class="primary" disabled>Get coaching advice</button><div class="conversation-scroll"><div id="advice" role="status" aria-live="polite">Choose a saved result.</div><div id="chat-messages" role="log" aria-label="Coaching conversation" aria-live="polite"></div></div><form id="chat-form"><label for="chat-input" class="hint">Ask about this recording</label><textarea id="chat-input" rows="2" maxlength="2000" placeholder="What should I focus on next?" disabled required></textarea><button id="chat-send" class="primary" disabled>Send</button><p id="chat-status" class="hint" role="status"></p></form><p id="llm-status" class="hint bottom-note">Advice uses measured stats and timestamped pose/ball samples. Videos stay local.</p></section></aside></main>
+<script>
+(function(){
+  const layout=document.getElementById('layout');
+  const sidebar=document.getElementById('sidebar');
+  const gutterCol=document.getElementById('gutter-col');
+  const gutterRow=document.getElementById('gutter-row');
+  const statsHalf=document.getElementById('stats-half');
+  const chatHalf=document.getElementById('chat-half');
+
+  function drag(gutter,axis,onMove){
+    let active=false;
+    function start(e){active=true;document.body.style.cursor=axis==='col'?'col-resize':'row-resize';document.body.style.userSelect='none';e.preventDefault();}
+    function move(e){if(!active)return;onMove(e);}
+    function stop(){if(!active)return;active=false;document.body.style.cursor='';document.body.style.userSelect='';}
+    gutter.addEventListener('mousedown',start);
+    gutter.addEventListener('touchstart',function(e){start(e.touches[0]);},{passive:false});
+    document.addEventListener('mousemove',move);
+    document.addEventListener('touchmove',function(e){if(active){move(e.touches[0]);e.preventDefault();}},{passive:false});
+    document.addEventListener('mouseup',stop);
+    document.addEventListener('touchend',stop);
+  }
+
+  drag(gutterCol,'col',function(e){
+    const rect=layout.getBoundingClientRect();
+    const pct=((e.clientX-rect.left)/rect.width)*100;
+    const clamped=Math.max(40,Math.min(80,pct));
+    layout.style.gridTemplateColumns=clamped+'% 6px 1fr';
+  });
+
+  drag(gutterRow,'row',function(e){
+    const rect=sidebar.getBoundingClientRect();
+    const pct=((e.clientY-rect.top)/rect.height)*100;
+    const clamped=Math.max(15,Math.min(70,pct));
+    sidebar.style.gridTemplateRows=clamped+'% 6px 1fr';
+  });
+})();
+</script>
+</body></html>

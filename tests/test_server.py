@@ -39,8 +39,37 @@ class StorageTests(unittest.TestCase):
         self.assertTrue((server.RESULTS/uid/'data.json').exists())
         self.assertEqual(self.request('GET','/results/'+uid+'/processed.webm',headers={'Range':'bytes=2-5'}),(206,b'2345'))
         self.assertEqual(self.request('GET',base)[0],200)
-        with patch.dict(server.os.environ,{'OPENAI_API_KEY':''}):
+        with patch.dict(server.os.environ,{'OPENAI_API_KEY':'','GEMINI_API_KEY':''}):
             self.assertEqual(self.request('POST',base+'/advice',{})[0],503)
+    def test_chat_persists_context_and_failure_does_not_save_question(self):
+        uid='a'*32
+        directory=server.RESULTS/uid;directory.mkdir()
+        server.write_json(directory/'data.json', {'samples':[], 'metrics':{}})
+        server.write_json(directory/'manifest.json', {'id':uid})
+        server.write_json(directory/'advice.json', {'text':'Existing advice'})
+        base='/api/results/'+uid
+        with patch.object(server, 'llm_provider', return_value='Gemini'), patch.object(server.Handler, '_call_gemini', return_value=('Focus on consistent framing.', 'test')) as call:
+            self.assertEqual(self.request('POST',base+'/chat',{'message':'   '})[0],400)
+            self.assertEqual(self.request('POST',base+'/chat',{'message':'x'*2001})[0],400)
+            status,body=self.request('POST',base+'/chat',{'message':'What next?'})
+            self.assertEqual(status,200)
+            self.assertEqual(len(json.loads(body)['messages']),2)
+            self.assertEqual(self.request('POST',base+'/chat',{'message':'Why?'})[0],200)
+            packet=json.loads(call.call_args.args[0])
+            self.assertEqual(packet['initial_advice'],'Existing advice')
+            self.assertEqual(len(packet['conversation']),3)
+            self.assertIn('CHAT MODE',call.call_args.args[1])
+            saved=json.loads(self.request('GET',base)[1])['chat']
+            self.assertEqual(len(saved['messages']),4)
+            call.side_effect=server.URLError('offline')
+            self.assertEqual(self.request('POST',base+'/chat',{'message':'Retry me'})[0],502)
+            self.assertEqual(server.read_json(directory/'chat.json'),saved)
+            call.side_effect=None
+            call.return_value=('', 'test')
+            self.assertEqual(self.request('POST',base+'/chat',{'message':'Empty reply'})[0],502)
+            self.assertEqual(server.read_json(directory/'chat.json'),saved)
+            self.assertEqual(self.request('POST','/api/results/'+'b'*32+'/chat',{'message':'Hello'})[0],404)
+
     def test_reject_cross_origin_and_traversal(self):
         self.assertEqual(self.request('POST','/api/results',{},headers={'Origin':'https://example.com'})[0],403)
         self.assertEqual(self.request('GET','/../server.py')[0],403)
