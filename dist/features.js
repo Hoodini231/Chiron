@@ -23,5 +23,5 @@ export function summarize(report) {
     // Angular values can cross ±180°; report observations without a misleading min/max span.
     wrist[side]={observations:values.length};
   }
-  return {duration_s:duration,processed_frames:n,processed_fps:duration>0?(n-1)/duration:null,ball_detection_fraction:n?seen/n:0,pose_detection_fraction:n?poses/n:0,hand_detection_fraction:n?handFrames/n:0,wrist_bend_samples:wrist,projected_angles_deg:angles,ball_speed_m_s:null,time_to_load_s:null,time_to_release_s:null,ball_spin_rpm:null};
+  return {duration_s:duration,processed_frames:n,processed_fps:duration>0?(report.throw_detection?n:n-1)/duration:null,...(report.throw_detection?{throw_count:report.throw_detection.segments.length,original_duration_s:report.capture.original_duration_s}:{}),ball_detection_fraction:n?seen/n:0,pose_detection_fraction:n?poses/n:0,hand_detection_fraction:n?handFrames/n:0,wrist_bend_samples:wrist,projected_angles_deg:angles,ball_speed_m_s:null,time_to_load_s:null,time_to_release_s:null,ball_spin_rpm:null};
 }

@@ -1,0 +1,6 @@
+Mediabunny 1.56.3 — unmodified browser ESM bundle (mediabunny.min.mjs).
+Copyright (c) Vanilagy and contributors. Licensed under MPL-2.0.
+License: MEDIABUNNY-LICENSE.txt
+Source and corresponding package: https://www.npmjs.com/package/mediabunny/v/1.56.3
+Upstream source: https://github.com/Vanilagy/mediabunny/tree/v1.56.3
+Package SHA-1: 0fb45c244caa0f86d53c3acbd591a75501013f17

@@ -9,6 +9,25 @@ from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 import server
 
+class AdvicePacketTests(unittest.TestCase):
+    def test_trimmed_advice_and_chat_context_use_output_time_and_reviewed_windows(self):
+        report={'metrics':{'duration_s':2},'throw_detection':{'reviewed':True,'is_heuristic':True,'segments':[
+            {'id':1,'source_start_s':3,'source_end_s':4,'output_start_s':0,'output_end_s':1},
+            {'id':2,'source_start_s':20,'source_end_s':21,'output_start_s':1,'output_end_s':2}]},
+            'samples':[{'t_s':0,'source_media_time_s':3,'throw_id':1},{'t_s':1,'source_media_time_s':20,'throw_id':2}]}
+        packet=server.advice_packet(report)
+        self.assertEqual([s['t_s'] for s in packet['timeline_downsampled']],[0,1])
+        self.assertEqual([s['source_media_time_s'] for s in packet['timeline_downsampled']],[3,20])
+        self.assertEqual(packet['throw_windows'],report['throw_detection'])
+        self.assertIn('joined-video',packet['timestamp_reference'])
+        self.assertIn('unmeasured',packet['event_detection'])
+
+    def test_legacy_reports_remain_supported(self):
+        packet=server.advice_packet({'samples':[{'t_s':3,'pose':None,'ball':None}]})
+        self.assertIsNone(packet['throw_windows'])
+        self.assertEqual(packet['timeline_downsampled'][0]['t_s'],3)
+        self.assertIn('not been detected',packet['event_detection'])
+
 class StorageTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()

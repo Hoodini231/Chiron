@@ -60,14 +60,17 @@ def advice_packet(report):
     timeline = []
     for sample in samples[::step]:
         pose = sample.get('pose')
-        timeline.append({'t_s': sample.get('t_s'), 'ball': sample.get('ball'),
+        timeline.append({'t_s': sample.get('t_s'), 'source_media_time_s': sample.get('source_media_time_s'),
+                         'throw_id': sample.get('throw_id'), 'ball': sample.get('ball'),
                          'features_2d': sample.get('features_2d'),
                          'hands': sample.get('hands', []),
                          'pose': {str(i): pose[i] for i in (11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28)} if pose and len(pose) == 33 else None})
     return {'measurement_mode': 'single_camera_uncalibrated', 'metrics': report.get('metrics'),
             'coordinate_system': report.get('coordinate_system'), 'body_pipeline': report.get('body_pipeline'), 'hands_pipeline': report.get('hands_pipeline'),
             'limitations': report.get('limitations'), 'timeline_downsampled': timeline,
-            'event_detection': 'Load, foot plant and release have not been detected.'}
+            'throw_windows': report.get('throw_detection'),
+            'timestamp_reference': 't_s is joined-video playback time; source_media_time_s is the original video time.' if report.get('throw_detection') else 't_s is recording playback time.',
+            'event_detection': 'Throw windows are reviewed motion estimates. Exact load, foot plant and release remain unmeasured.' if report.get('throw_detection') else 'Load, foot plant and release have not been detected.'}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -279,7 +282,8 @@ class Handler(BaseHTTPRequestHandler):
         'from a single uncalibrated 2D camera. Analyse the data internally but do NOT echo back '
         'raw coordinates, landmark names, field keys, or JSON values in your response. '
         'Describe what the body is doing in plain coaching language. Reference timestamps to anchor '
-        'observations (e.g. "at 3.2 s the elbow is nearly locked out") but never quote x=, y=, '
+        'observations using t_s playback time (e.g. "at 3.2 s the elbow is nearly locked out"), never source_media_time_s. '
+        'Treat reviewed throw windows as estimates and do not connect motion across different throw_id values. Never quote x=, y=, '
         'normalized coordinates, or landmark indices.\n\n'
 
         'Identify phase boundaries from the data: ball draw-back peak (load-to-release), '

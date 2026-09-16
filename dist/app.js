@@ -3,28 +3,34 @@ import {createPoseTracker, drawPose, LANDMARK_NAMES} from './pose.js';
 import {poseFeatures, summarize} from './features.js';
 import {createHandTracker, collectHands, drawHands, HAND_NAMES} from './hands.js';
 import {handFeatures} from './hand-features.js';
+import {validateWindows} from './throw-windows.js';
+import {scanThrows, processThrows, seekVideo} from './upload-processing.js';
+import {checkEncoderSupport, createVideoWriter} from './video-writer.js';
 const $ = id => document.getElementById(id);
 const video = $('source'), canvas = $('output'), ctx = canvas.getContext('2d');
 const small = document.createElement('canvas'), sctx = small.getContext('2d', {willReadFrequently:true});
 const rawFrame=document.createElement('canvas'), rawContext=rawFrame.getContext('2d');
 const isolatedFrame=document.createElement('canvas');
 let tracker, poseTracker, handTracker, stream, ready = false, opening = false, recording = null, picking = false, pendingSave = null;
-let uploadedFile=null, uploadURL=null, frameHandle=null, seekProcessing=false, mlTimestamp=0;
+let uploadedFile=null, uploadURL=null, frameHandle=null, mlTimestamp=0;
+let uploadJob=null, throwWindows=[], reviewing=false, previewEnd=null;
 let config = {colour:'red', hue:0, tolerance:14, saturation:140, isolate:false};
 let trail = [], latestTime = 0, lastFrame = -1, lastWall = 0, fps = 0, urls = [], finalizing = false;
-const FRAME_STEP = 1 / 30;
 
 function error(message) { $('error').textContent = message; $('error').hidden = !message; }
 function controls() {
-  const active = !!recording || finalizing || !!pendingSave;
+  const active = !!recording || !!uploadJob || finalizing || !!pendingSave;
   $('start').disabled = !ready || !(stream||uploadedFile) || active || opening;
-  $('start').textContent=uploadedFile?'▶ Process video':'● Start recording';
+  $('start').textContent=uploadedFile?(reviewing?'Find throws again':'Find throws'):'● Start recording';
   $('upload').disabled=$('upload-empty').disabled=active||opening;
   $('camera-source').hidden=!uploadedFile;
   $('camera-source').disabled=active||opening;
-  $('stop').disabled = !recording;
+  $('stop').disabled = !recording && !uploadJob;
+  $('stop').textContent = uploadJob?'Cancel':'■ Stop';
+  $('throw-review').querySelectorAll('input,button').forEach(e=>e.disabled=active);
+  if(!active) validateReview();
   $('enable').disabled = opening;
-  $('sample').disabled = !(stream||uploadedFile) || !ready || active;
+  $('sample').disabled = !(stream||uploadedFile) || !ready || active || reviewing;
   document.querySelectorAll('#colours input, input[type=range], #isolate').forEach(e => e.disabled = active);
 }
 async function loadTracker() {
@@ -61,7 +67,7 @@ async function loadHands(){
   catch(e){error('Could not load hand tracking. Reload to retry.');$('hand-state').textContent='Unavailable';}
 }
 async function enableCamera() {
-  if (opening || stream || recording || finalizing || pendingSave) return;
+  if (opening || stream || recording || uploadJob || finalizing || pendingSave) return;
   clearSource();
   opening = true; error(''); controls();
   try {
@@ -85,13 +91,14 @@ async function enableCamera() {
   } finally { opening = false; controls(); }
 }
 function clearSource(){
+  reviewing=false;throwWindows=[];previewEnd=null;setReview(false);
   if(frameHandle!==null){video.cancelVideoFrameCallback?.(frameHandle);cancelAnimationFrame(frameHandle);frameHandle=null;}
   stream?.getTracks().forEach(track=>track.stop());stream=null;video.pause();video.srcObject=null;
   if(uploadURL)URL.revokeObjectURL(uploadURL);
   uploadURL=null;uploadedFile=null;video.removeAttribute('src');tracker?.reset();trail=[];lastFrame=-1;
 }
 async function uploadVideo(file){
-  if(!file||recording||finalizing||pendingSave||opening)return;
+  if(!file||recording||uploadJob||finalizing||pendingSave||opening)return;
   if(file.size>160*1024*1024){error('Choose a video smaller than 160 MB.');return;}
   const type=file.type || (/\.mp4$/i.test(file.name)?'video/mp4':/\.webm$/i.test(file.name)?'video/webm':'');
   if(!['video/mp4','video/webm'].includes(type)){error('Choose an MP4 or WebM video.');return;}
@@ -110,7 +117,7 @@ async function uploadVideo(file){
     canvas.width=video.videoWidth;canvas.height=video.videoHeight;rawFrame.width=canvas.width;rawFrame.height=canvas.height;
     small.width=Math.min(640,canvas.width);small.height=Math.round(canvas.height*small.width/canvas.width);
     $('empty').hidden=true;$('mode').textContent='UPLOADED VIDEO';$('elapsed').textContent='00:00.0';
-    $('status').textContent='Choose ball colour, then press Process video. Keep this page visible until it finishes.';
+    $('status').textContent='Choose ball colour, then press Find throws. Keep this page visible until it finishes.';
     frame(performance.now(),{mediaTime:video.currentTime});
   }catch(e){clearSource();$('empty').hidden=false;error(e.message);}
   finally{opening=false;controls();}
@@ -121,15 +128,15 @@ $('camera-source').onclick=enableCamera;
 video.addEventListener('ended',()=>{if(uploadedFile&&!recording)stopRecording();});
 
 function scheduleFrame() {
-  if (!(stream||uploadedFile)) return;
+  if (!stream) return;
   if (video.requestVideoFrameCallback) frameHandle=video.requestVideoFrameCallback(frame);
   else frameHandle=requestAnimationFrame(now => frame(now, {mediaTime:video.currentTime}));
 }
-function frame(now, metadata) {
+function frame(now, metadata, {offline=false,detailed=true,outputFrame=null}={}) {
   frameHandle=null;
   if (!(stream||uploadedFile)) return;
   const t = metadata.mediaTime;
-  if ((!seekProcessing && lastFrame === t) || video.readyState < 2) {scheduleFrame(); return;}
+  if ((!offline && lastFrame === t) || video.readyState < 2) {if(!offline)scheduleFrame(); return;}
   lastFrame = t; latestTime = t;
   const dt = (now - lastWall) / 1000; lastWall = now;
   if (dt > 0 && dt < 1) fps = fps ? fps * .9 + (1 / dt) * .1 : 1 / dt;
@@ -139,12 +146,12 @@ function frame(now, metadata) {
   let ball = null, pose = null, hands = [];
   if (ready) {
     try {
-      mlTimestamp = seekProcessing ? mlTimestamp + 33.34 : now;
+      mlTimestamp = offline ? mlTimestamp + (detailed?1000/30:1000/15) : Math.max(mlTimestamp+.001,now);
       pose = poseTracker.detectForVideo(small, mlTimestamp).landmarks[0] ?? null;
-      hands = handFeatures(collectHands(handTracker.detectForVideo(rawFrame,mlTimestamp)),pose,canvas.width,canvas.height);
+      hands = detailed ? handFeatures(collectHands(handTracker.detectForVideo(rawFrame,mlTimestamp)),pose,canvas.width,canvas.height) : [];
       ball = tracker.detect(small, t, config, {hands, pose, isolationCanvas:config.isolate?isolatedFrame:null});
       if(config.isolate)ctx.drawImage(isolatedFrame,0,0,canvas.width,canvas.height);
-    } catch(e) {ready = false; stopRecording(); error('A processing pipeline failed. Reload the page to reset it.'); controls();}
+    } catch(e) {if(offline)throw new Error('A tracking pipeline failed. Your throw windows are kept; retry processing.');ready = false; stopRecording(); error('A processing pipeline failed. Reload the page to reset it.'); controls();}
   }
   drawPose(ctx, pose, canvas.width, canvas.height);
   drawHands(ctx,hands,canvas.width,canvas.height);
@@ -173,12 +180,17 @@ function frame(now, metadata) {
   const phaseLabels={near_hand:'Near hand',flight:'In flight',unassociated:'Detected'};
   $('ball-state').textContent = ball ? phaseLabels[ball.tracking_phase] : ready ? prediction?'Predicted briefly':'Not visible' : 'Waiting';
   $('score').textContent = ball ? ball.score.toFixed(2) : '—'; $('fps').textContent = fps ? Math.round(fps) : '—';
+  const detectorScale=canvas.width/small.width;
+  const sample = {frame_index:null, t_s:t, source_media_time_s:t, presented_frame:metadata.presentedFrames ?? null, ball:ball ? {x_px:+ball.x.toFixed(2),y_px:+ball.y.toFixed(2),radius_px:+ball.radius.toFixed(2),tracking_score:+ball.score.toFixed(3),observed:true,track_id:ball.track_id,tracking_phase:ball.tracking_phase,hand_distance_px:ball.hand_distance_px===null?null:+(ball.hand_distance_px*detectorScale).toFixed(2),hand_source:ball.hand_source,hand_side:ball.hand_side,motion_blur_candidate:ball.blurred,colour_mask_source:ball.mask_source} : null,ball_tracking:{state:ballStatus?.state??'searching',phase:ballStatus?.phase??'searching',phase_is_heuristic:true,track_id:ballStatus?.track_id??null},ball_prediction:prediction?{x_px:prediction.x*detectorScale,y_px:prediction.y*detectorScale,radius_px:prediction.radius*detectorScale,age_s:prediction.age_s,observed:false}:null,pose:pose?.map(p=>({x:p.x,y:p.y,z:p.z,visibility:p.visibility,presence:p.presence}))??null,features_2d:poseFeatures(pose,canvas.width,canvas.height),hands};
+  if(outputFrame){
+    ctx.fillStyle='#101319cf';ctx.fillRect(12,12,360,42);ctx.fillStyle='#c5f36b';ctx.font='18px monospace';
+    ctx.fillText(`THROW ${outputFrame.throw_id} · ${outputFrame.t_s.toFixed(2)}s`,24,39);
+  }
   if (recording) {
     const r = recording;
     if (r.origin === null) r.origin = t;
     const elapsed = t - r.origin;
-    const detectorScale=canvas.width/small.width;
-    r.samples.push({frame_index:r.samples.length, t_s:+elapsed.toFixed(6), source_media_time_s:t, presented_frame:metadata.presentedFrames ?? null, ball:ball ? {x_px:+ball.x.toFixed(2),y_px:+ball.y.toFixed(2),radius_px:+ball.radius.toFixed(2),tracking_score:+ball.score.toFixed(3),observed:true,track_id:ball.track_id,tracking_phase:ball.tracking_phase,hand_distance_px:ball.hand_distance_px===null?null:+(ball.hand_distance_px*detectorScale).toFixed(2),hand_source:ball.hand_source,hand_side:ball.hand_side,motion_blur_candidate:ball.blurred,colour_mask_source:ball.mask_source} : null,ball_tracking:{state:ballStatus?.state??'searching',phase:ballStatus?.phase??'searching',phase_is_heuristic:true,track_id:ballStatus?.track_id??null},ball_prediction:prediction?{x_px:prediction.x*detectorScale,y_px:prediction.y*detectorScale,radius_px:prediction.radius*detectorScale,age_s:prediction.age_s,observed:false}:null,pose:pose?.map(p=>({x:p.x,y:p.y,z:p.z,visibility:p.visibility,presence:p.presence}))??null,features_2d:poseFeatures(pose,canvas.width,canvas.height),hands});
+    r.samples.push({...sample,frame_index:r.samples.length,t_s:+elapsed.toFixed(6)});
     const label = `${Math.floor(elapsed / 60).toString().padStart(2,'0')}:${(elapsed % 60).toFixed(1).padStart(4,'0')}`;
     $('elapsed').textContent = label;
     const size = Math.max(16, Math.round(canvas.width / 55));
@@ -188,7 +200,8 @@ function frame(now, metadata) {
     r.processedStream.getVideoTracks()[0].requestFrame?.();
     if (performance.now() - r.startWall >= 120000) stopRecording();
   }
-  if (!seekProcessing) scheduleFrame();
+  if (!offline) scheduleFrame();
+  return sample;
 }
 function recorderFor(source, chunks) {
   const mimeType = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/mp4','video/webm'].find(t => MediaRecorder.isTypeSupported(t));
@@ -196,16 +209,91 @@ function recorderFor(source, chunks) {
   recorder.ondataavailable = e => {if (e.data.size) chunks.push(e.data);};
   return recorder;
 }
+function setReview(show) {
+  $('throw-review').hidden=!show;
+  video.hidden=!show;video.controls=show;
+  canvas.hidden=show;
+  video.classList.toggle('source-review',show);
+  canvas.parentElement.classList.toggle('reviewing',show);
+  if(!show) {video.pause();previewEnd=null;}
+}
+function validateReview() {
+  if(!reviewing) return;
+  let message='';
+  try {validateWindows(throwWindows,video.duration);}catch(e){message=e.message;}
+  $('window-error').textContent=message;
+  $('process-throws').disabled=!!message||!!uploadJob||finalizing||!!pendingSave;
+}
+function renderWindows() {
+  $('throw-windows').replaceChildren();
+  $('throw-review-message').textContent=throwWindows.length?'Estimated boundaries. Review the full motion and adjust as needed.':'No throws found. Play the video, then add a window for each throw.';
+  throwWindows.forEach((w,i)=>{
+    const row=document.createElement('fieldset');row.className='throw-window';
+    const legend=document.createElement('legend');legend.textContent=`Throw ${i+1}${w.edited?' · edited':w.estimates?.length?' · estimated':' · manual'}`;row.append(legend);
+    for(const [key,label] of [['start_s','Start'],['end_s','End']]) {
+      const wrap=document.createElement('label'),input=document.createElement('input');
+      input.type='number';input.step='0.001';input.min='0';input.max=String(video.duration);input.value=String(w[key]);
+      input.setAttribute('aria-label',`Throw ${i+1} ${label.toLowerCase()} in seconds`);
+      wrap.append(`${label} (s)`,input);row.append(wrap);
+      input.oninput=()=>{w[key]=input.value===''?NaN:Number(input.value);w.edited=true;legend.textContent=`Throw ${i+1} · edited`;validateReview();};
+      const mark=document.createElement('button');mark.textContent=`Set ${label.toLowerCase()} here`;mark.type='button';
+      mark.onclick=()=>{w[key]=+video.currentTime.toFixed(3);w.edited=true;renderWindows();};row.append(mark);
+    }
+    const preview=document.createElement('button');preview.textContent='Preview throw';preview.type='button';
+    preview.onclick=async()=>{
+      try {validateWindows([w],video.duration);previewEnd=null;await seekVideo(video,w.start_s);previewEnd=w.end_s;await video.play();}
+      catch(e){error(e.message);}
+    };
+    const remove=document.createElement('button');remove.textContent='Remove';remove.type='button';remove.onclick=()=>{throwWindows.splice(i,1);renderWindows();};
+    row.append(preview,remove);$('throw-windows').append(row);
+  });
+  validateReview();
+}
+$('add-throw').onclick=()=>{
+  const start=Math.max(0,Math.min(video.currentTime,video.duration-1/30));
+  throwWindows.push({start_s:+start.toFixed(6),end_s:Math.min(video.duration,start+2),edited:true,estimates:[]});renderWindows();
+};
+video.addEventListener('timeupdate',()=>{if(previewEnd!==null && video.currentTime>=previewEnd){video.pause();previewEnd=null;}});
+video.addEventListener('seeking',()=>{if(previewEnd!==null && video.currentTime>previewEnd)previewEnd=null;});
+
+function resetUploadTracking() {tracker.reset();trail=[];lastFrame=-1;mlTimestamp+=1000;}
+function uploadAnalysis(t,detailed,outputFrame) {return frame(performance.now(),{mediaTime:t},{offline:true,detailed,outputFrame});}
+async function findThrows() {
+  if(uploadJob||!uploadedFile||!ready||finalizing||pendingSave)return;
+  uploadJob=new AbortController();picking=false;canvas.parentElement.classList.remove('sampling');error('');setReview(false);controls();
+  try {
+    await checkEncoderSupport(canvas.width,canvas.height);
+    const windows=await scanThrows({video,analyze:uploadAnalysis,reset:resetUploadTracking,signal:uploadJob.signal,
+      progress:(t,d)=>{$('mode').textContent='FINDING THROWS';$('status').textContent=`Finding throws · ${t.toFixed(1)}s / ${d.toFixed(1)}s`;}});
+    throwWindows=windows;reviewing=true;
+    $('status').textContent=`${windows.length} throw windows found. Review their boundaries before processing.`;
+  }catch(e){error(e.message);$('status').textContent='Upload kept. Adjust windows or retry finding throws.';reviewing=true;}
+  finally{uploadJob=null;setReview(true);renderWindows();$('mode').textContent='REVIEW THROWS';controls();}
+}
+async function processApprovedThrows() {
+  if(uploadJob||!uploadedFile||!ready||finalizing||pendingSave)return;
+  try{validateWindows(throwWindows,video.duration);}catch(e){error(e.message);return;}
+  uploadJob=new AbortController();error('');setReview(false);controls();
+  try {
+    const processed=await processThrows({video,windows:throwWindows,analyze:uploadAnalysis,reset:resetUploadTracking,signal:uploadJob.signal,
+      createWriter:()=>createVideoWriter(canvas),progress:(done,total)=>{$('mode').textContent='PROCESSING THROWS';$('status').textContent=`Processing throws · ${done} / ${total} frames`;}});
+    const report=makeReport({samples:processed.samples,settings:{},config:{...config},file:uploadedFile},processed.duration_s);
+    Object.assign(report.capture,{original_filename:uploadedFile.name,original_duration_s:video.duration,analysis_fps:30,requested_fps:30,output_fps:30,
+      timestamp_source:'source_video_seek',recording_frame_alignment:'t_s and frame_index refer to the joined video; source_media_time_s refers to the original upload; source_analysis_frame uses a 30 FPS analysis grid, not native frame numbers'});
+    report.throw_detection={version:'motion_windows_v1',is_heuristic:true,scan_fps:15,reviewed:true,segments:processed.segments};
+    report.limitations=report.limitations.filter(s=>!['Throw events are not implemented','Video records browser processing cadence, not high-speed camera acquisition','Original and processed recorder start times may differ slightly'].includes(s));
+    report.limitations.push('Throw boundaries are reviewed motion estimates, not measured release events','Analysis samples the source at 30 FPS; fast movements and native frames may be missed');
+    report.metrics=summarize(report);
+    // Saving has its own retry lifecycle; never rescan or re-encode a completed export.
+    uploadJob=null;
+    await publishResult(report,processed.blob,uploadedFile);
+  }catch(e){error(e.message);$('status').textContent='Upload and throw windows kept. Adjust boundaries or retry processing.';}
+  finally{uploadJob=null;setReview(true);renderWindows();$('mode').textContent='REVIEW THROWS';controls();}
+}
+$('process-throws').onclick=processApprovedThrows;
 async function startRecording() {
-  if (!ready || !(stream||uploadedFile) || recording || finalizing || opening || pendingSave) return;
-  if(uploadedFile){
-    opening=true;controls();
-    try{
-      video.pause();
-      if(video.currentTime>0){await new Promise((resolve,reject)=>{video.addEventListener('seeked',resolve,{once:true});video.addEventListener('error',reject,{once:true});video.currentTime=0;});}
-      tracker.reset();lastFrame=-1;
-    }finally{opening=false;controls();}
-  }
+  if (!ready || !(stream||uploadedFile) || recording || uploadJob || finalizing || opening || pendingSave) return;
+  if(uploadedFile) return findThrows();
   error(''); picking = false; canvas.parentElement.classList.remove('sampling');
   let r;
   try {
@@ -222,41 +310,12 @@ async function startRecording() {
       rec.onstop = resolve; rec.onerror = () => {r.failed = true; error('Recording failed. Start a new clip.'); stopRecording();};
     })));
     recording = r; r.processed.start(1000); r.raw?.start(1000);
-    if(uploadedFile){
-      await processUploadedVideo(r);
-      return;
-    }
     r.timer = setTimeout(stopRecording, 120000);
     $('mode').textContent = '● RECORDING'; $('status').textContent = 'Recording body + ball + hands'; controls();
   } catch(e) {
     if (r) {recording = null; [r.processed,r.raw].forEach(rec => {if(rec?.state === 'recording') rec.stop();}); r.processedStream.getTracks().forEach(t => t.stop());}
     error(e.message); controls();
   }
-}
-async function processUploadedVideo(r) {
-  seekProcessing = true;
-  $('mode').textContent = '● PROCESSING'; controls();
-  const duration = video.duration;
-  let t = 0;
-  try {
-    while (t < duration && recording === r && !r.failed) {
-      video.currentTime = t;
-      await new Promise((resolve, reject) => {
-        video.addEventListener('seeked', resolve, {once: true});
-        video.addEventListener('error', reject, {once: true});
-      });
-      if (video.readyState < 2) await new Promise(resolve => {
-        video.addEventListener('canplay', resolve, {once: true});
-      });
-      frame(performance.now(), {mediaTime: t});
-      $('status').textContent = `Processing frame ${r.samples.length} · ${t.toFixed(1)}s / ${duration.toFixed(1)}s`;
-      await new Promise(resolve => setTimeout(resolve, 0));
-      t += FRAME_STEP;
-    }
-  } finally {
-    seekProcessing = false;
-  }
-  stopRecording();
 }
 async function stopRecording() {
   if (!recording) return;
@@ -268,12 +327,18 @@ async function stopRecording() {
   r.processedStream.getTracks().forEach(t => t.stop());
   finalizing = false; $('mode').textContent = uploadedFile?'UPLOADED VIDEO':stream ? 'LIVE CAMERA' : 'CAMERA OFF';
   if (!r.failed && r.chunks.length && r.samples.length) {
-    urls.forEach(URL.revokeObjectURL); urls = [];
-    const detected = r.samples.filter(s => s.ball).length;
     const duration = r.samples.at(-1).t_s;
+    const report=makeReport(r,duration);
+    const mime = r.processed.mimeType || r.chunks[0].type, rawMime = r.file?.type || r.raw?.mimeType || r.rawChunks[0]?.type || 'video/webm';
+    const processedBlob = new Blob(r.chunks,{type:mime}), rawBlob = r.file || new Blob(r.rawChunks,{type:rawMime});
+    await publishResult(report,processedBlob,rawBlob);
+  } else {error('No usable frames were recorded. Try a longer recording.'); $('status').textContent = 'Ready to retry';}
+  controls();
+}
+function makeReport(r,duration){
+    const detected=r.samples.filter(s=>s.ball).length;
     const report = {schema_version:'0.2',created_at:new Date().toISOString(),measurement_mode:'single_camera_uncalibrated',coordinate_system:{origin:'top_left',x:'right',y:'down',unit:'pixel',width:canvas.width,height:canvas.height},capture:{requested_fps:60,reported_camera_fps:r.settings.frameRate??null,processed_frames:r.samples.length,duration_s:duration,timestamp_source:video.requestVideoFrameCallback?'requestVideoFrameCallback.mediaTime':'video.currentTime',recording_frame_alignment:'t_s=0 is first processed frame after record start; recorder startup offset is not calibrated'},tracking:{method:'opencv_colour_segmentation_and_validated_circle_edges',...r.config,score_is_probability:false,detection_fraction:detected/r.samples.length},body_pipeline:{model:'mediapipe_pose_landmarker_full',version:'0.10.21',landmark_names:LANDMARK_NAMES,xy_units:'normalized_image_width_and_height',z_units:'model_relative_depth_not_calibrated',joint_angles:'projected_2d_degrees',visibility_threshold_for_angles:0.6},limitations:['No metric calibration','Throw events are not implemented','Tracking score is heuristic','Video records browser processing cadence, not high-speed camera acquisition','Original and processed recorder start times may differ slightly'],samples:r.samples};
     report.capture.source=r.file?'uploaded_video':'camera';
-    if(r.file){report.capture.original_filename=r.file.name;report.capture.original_duration_s=video.duration;report.capture.processed_segment_s=[0,duration];}
     report.metrics = summarize(report);
     report.tracking.association='hand_acquisition_ball_motion_v2';
     report.tracking.prediction_horizon_s=.2;
@@ -283,20 +348,20 @@ async function stopRecording() {
     report.limitations.push('Ball tracking phases are association heuristics, not validated release events; dashed predictions are excluded from measured ball positions');
     report.hands_pipeline={model:'mediapipe_hand_landmarker',version:'0.10.21',landmark_names:HAND_NAMES,xy_units:'normalized_image_width_and_height',z_units:'model_relative_depth_not_calibrated',handedness_score_is_landmark_confidence:false,association:'nearest_visible_pose_wrist_one_to_one_with_distance_gate',features:'projected_2d_degrees; wrist bend is signed forearm-to-middle-MCP direction, not anatomical flexion',frame_orientation:'unmirrored'};
     report.limitations.push('Hand landmarks do not measure ball spin, grip force, or true 3D curvature','Small or occluded hands may be missed; handedness score is classification confidence only');
+    return report;
+}
+async function publishResult(report,processedBlob,rawBlob){
+    urls.forEach(URL.revokeObjectURL);urls=[];
     const stamp = new Date().toISOString().replace(/[:.]/g,'-');
     function attach(id, blob, name) {const url = URL.createObjectURL(blob); urls.push(url); $(id).href=url; $(id).download=name; return url;}
-    const mime = r.processed.mimeType || r.chunks[0].type, rawMime = r.file?.type || r.raw?.mimeType || r.rawChunks[0]?.type || 'video/webm';
-    const processedBlob = new Blob(r.chunks,{type:mime}), rawBlob = r.file || new Blob(r.rawChunks,{type:rawMime});
-    $('playback').src = attach('download-video',processedBlob,`throw-${stamp}-processed.${mime.includes('mp4')?'mp4':'webm'}`);
-    attach('download-raw',rawBlob,`throw-${stamp}-original.${rawMime.includes('mp4')?'mp4':'webm'}`);
+    $('playback').src = attach('download-video',processedBlob,`throw-${stamp}-processed.${processedBlob.type.includes('mp4')?'mp4':'webm'}`);
+    attach('download-raw',rawBlob,`throw-${stamp}-original.${rawBlob.type.includes('mp4')?'mp4':'webm'}`);
     attach('download-data',new Blob([JSON.stringify(report,null,2)],{type:'application/json'}),`throw-${stamp}.json`);
-    $('summary').textContent = `${duration.toFixed(1)}s · ${r.samples.length} frames · ball visible in ${Math.round(detected/r.samples.length*100)}%`;
+    $('summary').textContent = `${report.throw_detection?report.throw_detection.segments.length+' throws · ':''}${report.metrics.duration_s.toFixed(1)}s · ${report.samples.length} frames · ball visible in ${Math.round(report.metrics.ball_detection_fraction*100)}%`;
     $('result').hidden = false; $('status').textContent = 'Recording complete. Saving to results…';
     $('advice').textContent = 'Open the saved result to review stats and request LLM advice.';
     pendingSave = {report,processedBlob,rawBlob};
     await saveResult();
-  } else {error('No usable frames were recorded. Try a longer recording.'); $('status').textContent = 'Ready to retry';}
-  controls();
 }
 async function saveResult() {
   if (!pendingSave) return;
@@ -315,7 +380,7 @@ async function saveResult() {
 }
 $('retry-save').onclick=saveResult;
 $('isolate').onchange=()=>{config.isolate=$('isolate').checked;};
-$('enable').onclick = enableCamera; $('start').onclick = startRecording; $('stop').onclick = stopRecording;
+$('enable').onclick = enableCamera; $('start').onclick = startRecording; $('stop').onclick = () => uploadJob?uploadJob.abort():stopRecording();
 document.querySelectorAll('[name=colour]').forEach(input => input.onchange = () => {
   config.colour=input.value; config.hue=PRESETS[input.value]; tracker?.reset(); trail=[];
   $('sample-hint').textContent='Sample the centre of the ball for your lighting.';
@@ -340,8 +405,8 @@ canvas.onclick = e => {
   picking=false; canvas.parentElement.classList.remove('sampling'); tracker.seed(x/canvas.width,y/canvas.height,latestTime); trail=[];
   $('sample-hint').textContent='Sampled colour active. Adjust tolerance if needed.';
 };
-document.addEventListener('visibilitychange',() => {if (document.hidden && recording) {stopRecording(); error('Recording stopped because the page was hidden. Keep this tab visible while recording.');}});
-window.addEventListener('pagehide',() => {if(uploadURL)URL.revokeObjectURL(uploadURL);stream?.getTracks().forEach(t=>t.stop()); poseTracker?.close(); handTracker?.close(); urls.forEach(URL.revokeObjectURL);});
+document.addEventListener('visibilitychange',() => {if(document.hidden && uploadJob)uploadJob.abort();if (document.hidden && recording) {stopRecording(); error('Recording stopped because the page was hidden. Keep this tab visible while recording.');}});
+window.addEventListener('pagehide',() => {uploadJob?.abort();if(uploadURL)URL.revokeObjectURL(uploadURL);stream?.getTracks().forEach(t=>t.stop()); poseTracker?.close(); handTracker?.close(); urls.forEach(URL.revokeObjectURL);});
 if (document.modelContext?.registerTool) {
   const lifecycle = new AbortController();
   const tool = {

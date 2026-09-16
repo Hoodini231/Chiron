@@ -30,6 +30,18 @@ results/<recording-id>/
 
 The Results page provides playback, duration, actual processing rate, detection coverage, projected elbow-angle ranges, ball path and LLM advice. Video seeking uses HTTP range requests. Unfinished writes stay in `.capture-temp/` and do not appear in Results. Save errors offer Retry and local downloads. Each clip is limited to two minutes; hiding the page stops recording. No audio is captured.
 
+## Uploaded videos: keep the throws
+
+Upload an MP4 or WebM (up to two minutes / 160 MB), choose the ball colour, then **Find throws**. A 15 FPS pose-and-ball scan proposes windows covering wind-up, release and follow-through, with 0.25 seconds of padding. Brief gaps can be bridged for boundary estimation; exported measurements still preserve missing detections. Ball separation supports a candidate when observed; strong arm motion can propose a window without ball visibility. These are heuristics, not validated release measurements.
+
+Review the original video with its playback controls. Edit each start/end time, use **Set start/end here**, preview a throw, or add/remove windows. If nothing is detected, mark throws manually. Windows must be inside the video, at least 1/30 second long and non-overlapping. **Process throws** runs body, hands and ball analysis only inside the approved windows, joining them chronologically into one annotated, silent WebM. A 26-second upload with three throws becomes one shorter video without the waiting time. The original file is saved unchanged.
+
+Export runs locally using WebCodecs and the vendored Mediabunny 1.56.3 bundle (MPL-2.0, source/license information in `dist/vendor/MEDIABUNNY-NOTICE.txt`). A current Chrome or Edge browser with VP9 or VP8 encoding support is required. Frames have explicit playback timestamps, so slow analysis does not slow down the exported video. Analysis uses a 30 FPS sampling grid; it does not recover every native frame or high-speed release detail. No server-side encoder or package installation is needed.
+
+Cancel, hiding the page, or a processing error preserves the upload and reviewed windows for retry without saving a partial result. The two-minute limit applies to source duration, not analysis time. Save failures retain the completed export for retry/download. Camera recording is unchanged, and old saved results remain readable.
+
+Reports retain schema `0.2` with optional `throw_detection` metadata containing reviewed source/output windows, original estimates and edited flags. `t_s` and `frame_index` refer to the joined video; `source_media_time_s` refers to the original upload. Source analysis-frame indices are explicitly a 30 FPS grid, not native frame numbers; segment end indices are exclusive. Statistics, trajectory and coaching use only retained samples, and coaching evidence timestamps match joined-video playback. Estimated source peaks outside an edited window have no output timestamp.
+
 ## Three pipelines
 
 Every processed frame is frozen once and shares one timestamp across:
@@ -60,13 +72,13 @@ To connect advice, copy `.env.example` to `.env`, set `OPENAI_API_KEY` privately
 
 This is a capture/integration prototype, not validated throwing analysis. Speed in m/s, load/release events, spin and true 3D ball curvature are explicitly unavailable. Finger and wrist signals can support later flick analysis, but do not establish spin or causation. Projected angles depend on camera view. Whole-clip angle ranges are not throwing-phase-specific ranges.
 
-CPU inference currently runs on the main browser thread. Processing cadence may be substantially below camera acquisition rate (the three-model test ran around 10–11 FPS on this host). Raw video is saved separately for later offline/high-frame-rate reprocessing. Do not use this live cadence to judge a fast wrist flick or exact release timing. The recorded stream and JSON begin with a small uncalibrated recorder startup offset. Motion blur, occlusion and matching-colour backgrounds can cause misses or identity switches.
+CPU inference currently runs on the main browser thread. Camera processing cadence may be substantially below camera acquisition rate (the three-model test ran around 10–11 FPS on this host). Raw video is saved separately for later offline/high-frame-rate reprocessing. Do not use this live cadence to judge a fast wrist flick or exact release timing. Camera recordings and JSON begin with a small uncalibrated recorder startup offset; uploaded-video exports use explicit timestamps. Motion blur, occlusion and matching-colour backgrounds can cause misses or identity switches.
 
 Future: workers/offline frame processing, manually validated phase detection, hand/ball separation events, calibration, synchronized views, phase-specific evidence and within-athlete comparisons.
 
 ## Checks
 
-- `npm test`: hue wrapping, actual OpenCV detections for all four colours, hand-versus-distractor selection, motion-supported blur, flight transition, short occlusion/reacquisition, curved paths, projected angles, hand association and tiny-hand suppression.
+- `npm test`: tracking and pose fixtures; three-throw detection, editable boundaries, gaps and edge cases; cancellation/retry, camera regression, original-file preservation and real WebM container timing. Container tests use header fixtures and do not exercise a browser's actual video encoder. No real-world throw-detection accuracy percentage is claimed.
 - `python3 -B -m unittest discover -s tests -p 'test_*.py'`: isolated save transaction, incomplete recording exclusion, playback range requests, origin/path restrictions and missing LLM key.
 - `python3 server.py --port 8766 --test-mode`: isolated browser QA. Open `/__test__/capture` for an animated synthetic ball, `?pose=1` for a body fixture or `?pose=hands` for a hand fixture. Test recordings go to a temporary directory, not your results folder. These routes are disabled in normal mode.
 
