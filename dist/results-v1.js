@@ -423,13 +423,29 @@ function renderPipeline(record) {
   html += section('Capture');
   html += '<div class="dashboard">';
   html += card('Duration', `${m.duration_s?.toFixed(1) ?? '—'}s`, `${m.processed_frames} frames`);
-  html += card('Processed FPS', m.processed_fps?.toFixed(1) ?? '—', `Requested 60 fps`);
+  if (rpt.throw_detection) {
+    html += card('Throws', rpt.throw_detection.segments.length, 'Reviewed windows');
+    html += card(
+      'Original duration',
+      `${cap.original_duration_s.toFixed(1)}s`,
+      'Waiting time removed',
+    );
+  }
+  html += card(
+    'Processed FPS',
+    m.processed_fps?.toFixed(1) ?? '—',
+    `Requested ${cap.requested_fps ?? 60} fps`,
+  );
   html += card(
     'Source',
     esc(cap.source || 'unknown'),
     cs.width ? `${cs.width} × ${cs.height}` : '',
   );
-  html += card('Timestamp', 'requestVideoFrameCallback', 'Frame-accurate');
+  html += card(
+    'Timestamp',
+    esc(cap.timestamp_source || 'Unknown'),
+    rpt.throw_detection ? 'Joined-video playback time' : 'Recorded sample time',
+  );
   html += '</div>';
 
   html += section('Detection rates');
@@ -552,7 +568,12 @@ function drawTrajectory(id, samples, cs) {
     const x = ox + s.ball.x_px * scale;
     const y = oy + s.ball.y_px * scale;
     ctx.beginPath();
-    if (prev && s.t_s - prev.t < 0.12 && prev.tid === s.ball.track_id) {
+    if (
+      prev &&
+      s.t_s - prev.t < 0.12 &&
+      prev.tid === s.ball.track_id &&
+      prev.throw_id === s.throw_id
+    ) {
       ctx.moveTo(prev.x, prev.y);
       ctx.lineTo(x, y);
       ctx.stroke();
@@ -561,7 +582,7 @@ function drawTrajectory(id, samples, cs) {
       ctx.arc(x, y, 2, 0, 2 * Math.PI);
       ctx.fill();
     }
-    prev = { x, y, t: s.t_s, tid: s.ball.track_id };
+    prev = { x, y, t: s.t_s, tid: s.ball.track_id, throw_id: s.throw_id };
   }
 }
 
@@ -609,7 +630,8 @@ function renderChat(chat) {
   c.innerHTML = '';
   const msgs = chat?.messages || [];
   if (!msgs.length) {
-    c.innerHTML = '<div class="chat-empty">Ask the coach about your throw — technique, drills, or what to focus on next.</div>';
+    c.innerHTML =
+      '<div class="chat-empty">Ask the coach about your throw — technique, drills, or what to focus on next.</div>';
     return;
   }
   for (const msg of msgs) {
@@ -618,7 +640,9 @@ function renderChat(chat) {
       `<span class="msg-label">${msg.role === 'user' ? 'You' : 'Coach'}</span>` +
       `${esc(msg.text)}</div>`;
   }
-  requestAnimationFrame(() => { c.scrollTop = c.scrollHeight; });
+  requestAnimationFrame(() => {
+    c.scrollTop = c.scrollHeight;
+  });
 }
 
 // ── Video crop from wireframe ──

@@ -60,6 +60,7 @@ export function summarize(report) {
   // Rotational velocities (deg/s) for shoulder and hip lines
   const rotVel = { shoulder: [], hip: [] };
   for (let i = 1; i < samples.length; i++) {
+    if (samples[i].throw_id !== samples[i - 1].throw_id) continue;
     const dt = samples[i].t_s - samples[i - 1].t_s;
     if (dt <= 0 || dt > 0.2) continue;
     for (const [key, arr] of [
@@ -91,7 +92,13 @@ export function summarize(report) {
   return {
     duration_s: duration,
     processed_frames: n,
-    processed_fps: duration > 0 ? (n - 1) / duration : null,
+    processed_fps: duration > 0 ? (report.throw_detection ? n : n - 1) / duration : null,
+    ...(report.throw_detection
+      ? {
+          throw_count: report.throw_detection.segments.length,
+          original_duration_s: report.capture.original_duration_s,
+        }
+      : {}),
     ball_detection_fraction: n ? seen / n : 0,
     pose_detection_fraction: n ? poses / n : 0,
     hand_detection_fraction: n ? handFrames / n : 0,

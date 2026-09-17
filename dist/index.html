@@ -22,7 +22,8 @@
           aria-label="Camera with body skeleton, hand landmarks and ball trail"
         ></canvas>
         <div class="video-header">
-          <span>DODGEBALL / CAPTURE</span><a href="results-v1.html">Analysis ↗</a><a href="results.html">Results ↗</a>
+          <span>DODGEBALL / CAPTURE</span><a href="results-v1.html">Analysis ↗</a
+          ><a href="results.html">Results ↗</a>
         </div>
         <div id="empty">
           <h1>Frame your throw.</h1>
@@ -100,6 +101,17 @@
           </p>
         </section>
         <section class="half advice-panel">
+          <section id="throw-review" hidden aria-labelledby="throw-review-heading">
+            <h2 id="throw-review-heading">Review throws</h2>
+            <p id="throw-review-message"></p>
+            <div id="throw-windows"></div>
+            <button id="add-throw">Add throw here</button>
+            <p id="window-error" role="status"></p>
+            <button id="process-throws" class="primary">Process throws</button>
+            <p class="hint">
+              Wind-up through follow-through. Waiting time is removed. The original video is kept.
+            </p>
+          </section>
           <h2>Advice <span class="tag">LLM</span></h2>
           <div id="advice">
             <p class="muted">Record a throw to review its stats and request coaching feedback.</p>
