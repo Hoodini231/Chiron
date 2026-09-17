@@ -1,0 +1,33 @@
+:root {
+  color-scheme: dark;
+
+  /* Brand palette */
+  --bg: #101319;
+  --bg-deep: #080b10;
+  --surface: #171e26;
+  --surface-hover: #2e3844;
+  --card: #232b36;
+  --border: #3c4552;
+  --border-soft: #38414d;
+
+  /* Text */
+  --text: #e7ebf0;
+  --text-strong: #edf0f5;
+  --text-muted: #a5b3c2;
+  --text-hint: #93a1b2;
+
+  /* Accent */
+  --accent: #c5f36b;
+  --accent-bg: #263025;
+  --accent-text: #18200e;
+
+  /* Semantic */
+  --error: #ffa9aa;
+  --tag-border: #3b4552;
+  --tag-text: #96a4b5;
+
+  /* Typography */
+  --font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, monospace;
+}

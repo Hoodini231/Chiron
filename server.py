@@ -464,11 +464,14 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global RESULTS, STAGING
+    global PUBLIC, RESULTS, STAGING
     parser = argparse.ArgumentParser()
     parser.add_argument('--port',type=int,default=8765)
+    parser.add_argument('--frontend', type=str, default=None, help='Directory to serve frontend from (default: auto-detect frontend/dist or dist).')
     parser.add_argument('--test-mode', action='store_true', help='Synthetic camera fixture; stores recordings in a temporary directory.')
     args = parser.parse_args()
+    if args.frontend:
+        PUBLIC = Path(args.frontend).resolve()
     if args.test_mode:
         test_root = Path(tempfile.mkdtemp(prefix='dodgeball-qa-'))
         RESULTS = test_root/'results'
