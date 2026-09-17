@@ -145,6 +145,10 @@ async function show(id) {
     $('trajectory').hidden = false;
     $('result-stats').replaceChildren();
     const m = record.metrics;
+    if (record.report.throw_detection) {
+      stat('Throws', record.report.throw_detection.segments.length);
+      stat('Original duration', `${record.report.capture.original_duration_s.toFixed(1)} s`);
+    }
     stat('Duration', `${m.duration_s.toFixed(1)} s`);
     stat('Processed FPS', m.processed_fps?.toFixed(1) ?? '—');
     stat('Ball visible', percent(m.ball_detection_fraction));
@@ -170,7 +174,12 @@ async function show(id) {
       const x = ox + s.ball.x_px * scale,
         y = oy + s.ball.y_px * scale;
       ctx.beginPath();
-      if (previous && s.t_s - previous.t < 0.12 && previous.track_id === s.ball.track_id) {
+      if (
+        previous &&
+        s.t_s - previous.t < 0.12 &&
+        previous.track_id === s.ball.track_id &&
+        previous.throw_id === s.throw_id
+      ) {
         ctx.moveTo(previous.x, previous.y);
         ctx.lineTo(x, y);
         ctx.stroke();
@@ -179,7 +188,7 @@ async function show(id) {
         ctx.arc(x, y, 2, 0, 2 * Math.PI);
         ctx.fill();
       }
-      previous = { x, y, t: s.t_s, track_id: s.ball.track_id };
+      previous = { x, y, t: s.t_s, track_id: s.ball.track_id, throw_id: s.throw_id };
     }
     $('advice').textContent =
       record.advice?.text ||
