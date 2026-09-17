@@ -1,5 +1,5 @@
-let media;
-const loadMedia = () => (media ??= import('./vendor/mediabunny-1.56.3.mjs'));
+let    media;
+const loadMedia=()=>media    ??=    import(   './vendor/mediabunny-1.56.3.mjs'   );
 const unsupported = () =>
   new Error(
     'This browser cannot export trimmed video. Open the local app in a current Chrome or Edge browser.',
