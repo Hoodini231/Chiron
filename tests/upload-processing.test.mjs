@@ -31,7 +31,7 @@ test('cancelling processing releases writer and preserves editable windows for r
   await assert.rejects(processThrows(options),{name:'AbortError'});
   assert.equal(cancelled,1);assert.equal(finished,0);assert.equal(JSON.stringify(windows),snapshot);
   const retry=await processThrows({...options,signal:new AbortController().signal,createWriter:async()=>({add:async()=>{},finish:async()=>new Blob(['ok']),cancel:async()=>{}})});
-  assert.equal(retry.samples.length,6);
+  assert.equal(retry.samples.length,48);
 });
 test('encoder failures discard partial output and absent encoding support gives actionable message',async()=>{
   let cancelled=false;

@@ -55,7 +55,7 @@ test('edited windows sort chronologically and preserve source/output timestamps'
   assert.equal(result.duration_s,2.51);
   assert.deepEqual(result.segments.map(s=>[s.source_start_s,s.output_start_s,s.output_end_s]),[[3,0,1.5],[20,1.5,2.51]]);
   assert.equal(result.frames.find(s=>s.throw_id===2).source_media_time_s,20);
-  assert.equal(result.frames.find(s=>s.throw_id===2).source_analysis_frame,600);
+  assert.equal(result.frames.find(s=>s.throw_id===2).source_analysis_frame,4800);
   assert.equal(result.segments[1].edited,true);
   for(const windows of [[],[{start_s:-1,end_s:1}],[{start_s:1,end_s:27}],[{start_s:1,end_s:1}],[{start_s:NaN,end_s:2}],[{start_s:1,end_s:3},{start_s:2,end_s:4}]]) assert.throws(()=>validateWindows(windows,26));
 });

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { validateWindows } from '../dist/throw-windows.js';
+import { validateWindows, ANALYSIS_FPS } from '../dist/throw-windows.js';
 import { scanThrows, processThrows, seekVideo } from '../dist/upload-processing.js';
 import { summarize, poseFeatures } from '../dist/features.js';
 import { throwSample } from './throw-fixtures.mjs';
@@ -138,6 +138,7 @@ function harness({ throws = [0.2], duration = 3, saveFails = false } = {}) {
     summarize,
     LANDMARK_NAMES: [],
     HAND_NAMES: [],
+    ANALYSIS_FPS,
     validateWindows,
     scanThrows,
     processThrows,
@@ -183,7 +184,7 @@ test('uploaded video scans, reviews, then saves only retained samples and unchan
   assert.equal($('process-throws').disabled, false);
   await api.processApprovedThrows();
   assert.equal(api.state().pendingSave, null);
-  assert.equal(encoded.length, 45);
+  assert.equal(encoded.length, 360);
   assert.equal(requests.find((r) => r.url.endsWith('/original.webm')).body, file);
   const report = JSON.parse(requests[0].body).report;
   assert.equal(report.capture.source, 'uploaded_video');
@@ -191,7 +192,7 @@ test('uploaded video scans, reviews, then saves only retained samples and unchan
   assert.equal(report.samples[0].source_media_time_s, 0.3);
   assert.equal(report.capture.original_filename, 'throw.webm');
   assert.equal(report.metrics.duration_s, 1.5);
-  assert.equal(report.metrics.processed_fps, 30);
+  assert.equal(report.metrics.processed_fps, 240);
   assert.equal(report.metrics.throw_count, 1);
   assert.equal(report.throw_detection.segments[0].edited, true);
 });

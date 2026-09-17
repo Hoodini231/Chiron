@@ -1,5 +1,5 @@
 // Throw windows are reviewable motion heuristics, never measured release events.
-export const ANALYSIS_FPS = 30;
+export const ANALYSIS_FPS = 240;
 export const SCAN_FPS = 15;
 const round = n => Math.round(n * 1e6) / 1e6;
 const valid = p => p && Number.isFinite(p.x) && Number.isFinite(p.y) && (p.visibility ?? 0) >= .6 && (p.presence ?? 1) >= .5;

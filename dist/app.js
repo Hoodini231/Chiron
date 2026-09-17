@@ -3,7 +3,7 @@ import { createPoseTracker, drawPose, LANDMARK_NAMES } from './pose.js';
 import { poseFeatures, summarize } from './features.js';
 import { createHandTracker, collectHands, drawHands, HAND_NAMES } from './hands.js';
 import { handFeatures } from './hand-features.js';
-import { validateWindows } from './throw-windows.js';
+import { validateWindows, ANALYSIS_FPS } from './throw-windows.js';
 import { scanThrows, processThrows, seekVideo } from './upload-processing.js';
 import { checkEncoderSupport, createVideoWriter } from './video-writer.js';
 const $ = (id) => document.getElementById(id);
@@ -322,7 +322,7 @@ function frame(now, metadata, { offline = false, detailed = true, outputFrame = 
   if (ready) {
     try {
       mlTimestamp = offline
-        ? mlTimestamp + (detailed ? 1000 / 30 : 1000 / 15)
+        ? mlTimestamp + (detailed ? 1000 / ANALYSIS_FPS : 1000 / 15)
         : Math.max(mlTimestamp + 0.001, now);
       pose = poseTracker.detectForVideo(small, mlTimestamp).landmarks[0] ?? null;
       hands = detailed
@@ -609,7 +609,7 @@ function renderWindows() {
   validateReview();
 }
 $('add-throw').onclick = () => {
-  const start = Math.max(0, Math.min(video.currentTime, video.duration - 1 / 30));
+  const start = Math.max(0, Math.min(video.currentTime, video.duration - 1 / ANALYSIS_FPS));
   throwWindows.push({
     start_s: +start.toFixed(6),
     end_s: Math.min(video.duration, start + 2),
@@ -705,12 +705,12 @@ async function processApprovedThrows() {
     Object.assign(report.capture, {
       original_filename: uploadedFile.name,
       original_duration_s: video.duration,
-      analysis_fps: 30,
-      requested_fps: 30,
-      output_fps: 30,
+      analysis_fps: ANALYSIS_FPS,
+      requested_fps: ANALYSIS_FPS,
+      output_fps: ANALYSIS_FPS,
       timestamp_source: 'source_video_seek',
       recording_frame_alignment:
-        't_s and frame_index refer to the joined video; source_media_time_s refers to the original upload; source_analysis_frame uses a 30 FPS analysis grid, not native frame numbers',
+        `t_s and frame_index refer to the joined video; source_media_time_s refers to the original upload; source_analysis_frame uses a ${ANALYSIS_FPS} FPS analysis grid, not native frame numbers`,
     });
     report.throw_detection = {
       version: 'motion_windows_v1',
@@ -729,7 +729,7 @@ async function processApprovedThrows() {
     );
     report.limitations.push(
       'Throw boundaries are reviewed motion estimates, not measured release events',
-      'Analysis samples the source at 30 FPS; fast movements and native frames may be missed',
+      `Analysis samples the source at ${ANALYSIS_FPS} FPS; fast movements and native frames may be missed`,
     );
     report.metrics = summarize(report);
     // Saving has its own retry lifecycle; never rescan or re-encode a completed export.
