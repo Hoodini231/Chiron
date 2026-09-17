@@ -6,3 +6,5 @@ results/*
 !results/.gitkeep
 .capture-temp/
 __pycache__/
+frontend/dist/
+frontend/node_modules/

@@ -23,7 +23,7 @@ jobs:
 
       - run: npm install
 
-      - run: npx prettier --write 'dist/**/*.{js,html,css}' 'tests/**/*.{js,mjs}'
+      - run: npx prettier --write 'dist/**/*.{js,html,css}' 'tests/**/*.{js,mjs}' 'frontend/src/**/*.{ts,tsx,css}'
 
       - name: Commit formatting changes
         run: |
