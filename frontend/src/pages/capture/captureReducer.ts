@@ -54,10 +54,7 @@ export const initialState: CaptureState = {
   opening: false,
 };
 
-export function captureReducer(
-  state: CaptureState,
-  action: CaptureAction,
-): CaptureState {
+export function captureReducer(state: CaptureState, action: CaptureAction): CaptureState {
   switch (action.type) {
     case 'PIPELINE_LOADED': {
       const pipelines = { ...state.pipelines, [action.pipeline]: true };
@@ -179,9 +176,10 @@ export function captureReducer(
       return {
         ...initialState,
         pipelines: state.pipelines,
-        phase: state.pipelines.ball && state.pipelines.pose && state.pipelines.hands
-          ? 'idle'
-          : 'loading',
+        phase:
+          state.pipelines.ball && state.pipelines.pose && state.pipelines.hands
+            ? 'idle'
+            : 'loading',
       };
 
     case 'ERROR':

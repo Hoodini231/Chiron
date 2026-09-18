@@ -6,10 +6,7 @@ interface UseApiState<T> {
   error: string | null;
 }
 
-export function useApi<T>(
-  fetcher: (signal: AbortSignal) => Promise<T>,
-  deps: unknown[] = [],
-) {
+export function useApi<T>(fetcher: (signal: AbortSignal) => Promise<T>, deps: unknown[] = []) {
   const [state, setState] = useState<UseApiState<T>>({
     data: null,
     loading: true,

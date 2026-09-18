@@ -133,10 +133,8 @@ function parsePriorities(body: string): AdvicePriority[] {
     if (titleMatch) {
       let detail = '';
       if (issueMatch) detail += issueMatch[1].trim();
-      if (drillMatch)
-        detail += (detail ? ' ' : '') + 'Drill: ' + drillMatch[1].trim();
-      if (cueMatch)
-        detail += (detail ? ' ' : '') + 'Cue: ' + cueMatch[1].trim();
+      if (drillMatch) detail += (detail ? ' ' : '') + 'Drill: ' + drillMatch[1].trim();
+      if (cueMatch) detail += (detail ? ' ' : '') + 'Cue: ' + cueMatch[1].trim();
       return { title: titleMatch[1].trim(), detail };
     }
 
@@ -154,9 +152,7 @@ function parsePriorities(body: string): AdvicePriority[] {
 function detectStatus(note: string, body: string): 'good' | 'improve' | 'limited' {
   const text = (note + ' ' + body).toLowerCase();
 
-  const verdictMatch = text.match(
-    /verdict:\s*(strong|needs?\s*work|insufficient\s*data)/i,
-  );
+  const verdictMatch = text.match(/verdict:\s*(strong|needs?\s*work|insufficient\s*data)/i);
   if (verdictMatch) {
     const v = verdictMatch[1].toLowerCase();
     if (v.includes('insufficient')) return 'limited';
@@ -164,11 +160,7 @@ function detectStatus(note: string, body: string): 'good' | 'improve' | 'limited
     return 'good';
   }
 
-  if (
-    /insufficient|cannot be assessed|only one|cannot assess|no clear|sparse/.test(
-      text,
-    )
-  )
+  if (/insufficient|cannot be assessed|only one|cannot assess|no clear|sparse/.test(text))
     return 'limited';
   if (
     /needs? work|improve|issue|problem|not enough|limited|abrupt|missing|not smooth|not consistently|minimal|poor|lacking|weak|no (?:clear|meaningful|significant)|arm.dominant|upper.body.dominant|doesn.t|does not|isn.t|little|stiff|early|late|skip/.test(

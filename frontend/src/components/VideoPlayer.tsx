@@ -97,10 +97,7 @@ export default function VideoPlayer({ src, videoRef: externalRef }: Props) {
     const v = videoEl.current;
     if (!v) return;
     v.pause();
-    v.currentTime = Math.max(
-      0,
-      Math.min(v.duration, v.currentTime + dir * FRAME_DUR),
-    );
+    v.currentTime = Math.max(0, Math.min(v.duration, v.currentTime + dir * FRAME_DUR));
   };
 
   const changeSpeed = (newSpeed: number) => {

@@ -38,11 +38,7 @@ export function getResult(id: string): Promise<ResultDetailResponse> {
   return api(`/api/results/${id}`);
 }
 
-export function saveResult(
-  report: Report,
-  videoMime: string,
-  rawMime: string,
-): Promise<Manifest> {
+export function saveResult(report: Report, videoMime: string, rawMime: string): Promise<Manifest> {
   return api('/api/results', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -50,11 +46,7 @@ export function saveResult(
   });
 }
 
-export function uploadVideo(
-  id: string,
-  filename: string,
-  blob: Blob,
-): Promise<void> {
+export function uploadVideo(id: string, filename: string, blob: Blob): Promise<void> {
   return fetch(`/api/results/${id}/${filename}`, {
     method: 'PUT',
     body: blob,
@@ -71,10 +63,7 @@ export function completeResult(id: string): Promise<Manifest> {
   });
 }
 
-export function getAdvice(
-  id: string,
-  regenerate = false,
-): Promise<Advice> {
+export function getAdvice(id: string, regenerate = false): Promise<Advice> {
   return api(`/api/results/${id}/advice`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -82,10 +71,7 @@ export function getAdvice(
   });
 }
 
-export function sendChat(
-  id: string,
-  message: string,
-): Promise<ChatState> {
+export function sendChat(id: string, message: string): Promise<ChatState> {
   return api(`/api/results/${id}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -8,12 +8,7 @@ interface Props {
   status?: string;
 }
 
-export default function ChatPanel({
-  messages,
-  onSend,
-  disabled = false,
-  status,
-}: Props) {
+export default function ChatPanel({ messages, onSend, disabled = false, status }: Props) {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
