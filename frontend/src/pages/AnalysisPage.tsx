@@ -15,11 +15,7 @@ import { percent } from '../utils/format';
 import '../styles/analysis.css';
 
 function badgeFor(status: string) {
-  return status === 'good'
-    ? 'Strong'
-    : status === 'improve'
-      ? 'Needs work'
-      : 'Insufficient data';
+  return status === 'good' ? 'Strong' : status === 'improve' ? 'Needs work' : 'Insufficient data';
 }
 
 function classFor(status: string) {
@@ -52,10 +48,7 @@ function shortMethod(m: string | undefined) {
   return m
     ? m
         .replace(/_/g, ' ')
-        .replace(
-          'opencv colour segmentation and validated circle edges',
-          'Colour + circle edges',
-        )
+        .replace('opencv colour segmentation and validated circle edges', 'Colour + circle edges')
     : '—';
 }
 
@@ -133,9 +126,7 @@ export default function AnalysisPage() {
     setAdviceBusy(true);
     try {
       const advice = await api.getAdvice(resultId);
-      setCurrent((prev) =>
-        prev?.id === resultId ? { ...prev, advice } : prev,
-      );
+      setCurrent((prev) => (prev?.id === resultId ? { ...prev, advice } : prev));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -144,9 +135,7 @@ export default function AnalysisPage() {
   };
 
   const handleSendChat = async () => {
-    const input = document.querySelector<HTMLTextAreaElement>(
-      '.chat-popup-input textarea',
-    );
+    const input = document.querySelector<HTMLTextAreaElement>('.chat-popup-input textarea');
     if (!input || !current || !available || chatBusy) return;
     const message = input.value.trim();
     if (!message) return;
@@ -155,9 +144,7 @@ export default function AnalysisPage() {
     setChatStatus('Coach is replying...');
     try {
       const chat = await api.sendChat(resultId, message);
-      setCurrent((prev) =>
-        prev?.id === resultId ? { ...prev, chat } : prev,
-      );
+      setCurrent((prev) => (prev?.id === resultId ? { ...prev, chat } : prev));
       input.value = '';
       setChatStatus('Conversation saved.');
     } catch (err) {
@@ -191,14 +178,10 @@ export default function AnalysisPage() {
     <>
       <div className="top-bar">
         <a href="#/results">← Results</a>
-        <select
-          value={id ?? ''}
-          onChange={(e) => navigate(`/analysis/${e.target.value}`)}
-        >
+        <select value={id ?? ''} onChange={(e) => navigate(`/analysis/${e.target.value}`)}>
           {recordings.map((r) => (
             <option key={r.id} value={r.id}>
-              {new Date(r.created_at).toLocaleString()} ·{' '}
-              {r.metrics.duration_s.toFixed(1)}s
+              {new Date(r.created_at).toLocaleString()} · {r.metrics.duration_s.toFixed(1)}s
             </option>
           ))}
         </select>
@@ -240,9 +223,7 @@ export default function AnalysisPage() {
                   onClick={handleGenerateAdvice}
                   disabled={!available || adviceBusy}
                 >
-                  {adviceBusy
-                    ? 'Generating...'
-                    : 'Get coaching advice'}
+                  {adviceBusy ? 'Generating...' : 'Get coaching advice'}
                 </button>
               </div>
             ) : (
@@ -265,10 +246,7 @@ export default function AnalysisPage() {
         {advice && (
           <>
             <div className="section-title">COACHING BREAKDOWN</div>
-            <CoachingBreakdown
-              advice={advice}
-              duration={m?.duration_s}
-            />
+            <CoachingBreakdown advice={advice} duration={m?.duration_s} />
           </>
         )}
 
@@ -282,10 +260,7 @@ export default function AnalysisPage() {
 
         {/* Pipeline Data Drawer */}
         <div className="divider" />
-        <button
-          className="data-toggle"
-          onClick={() => setDrawerOpen(!drawerOpen)}
-        >
+        <button className="data-toggle" onClick={() => setDrawerOpen(!drawerOpen)}>
           {drawerOpen ? '▾' : '▸'} Pipeline data
         </button>
         <div
@@ -294,9 +269,7 @@ export default function AnalysisPage() {
             gridTemplateRows: drawerOpen ? '1fr' : '0fr',
           }}
         >
-          <div className="data-drawer-inner">
-            {current && <PipelineData record={current} />}
-          </div>
+          <div className="data-drawer-inner">{current && <PipelineData record={current} />}</div>
         </div>
       </div>
 
@@ -321,18 +294,12 @@ export default function AnalysisPage() {
           <div className="chat-messages">
             {(current?.chat?.messages?.length ?? 0) === 0 ? (
               <div className="chat-empty">
-                Ask the coach about your throw — technique, drills, or what to
-                focus on next.
+                Ask the coach about your throw — technique, drills, or what to focus on next.
               </div>
             ) : (
               current?.chat?.messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`chat-msg ${msg.role === 'user' ? 'user' : 'coach'}`}
-                >
-                  <span className="msg-label">
-                    {msg.role === 'user' ? 'You' : 'Coach'}
-                  </span>
+                <div key={i} className={`chat-msg ${msg.role === 'user' ? 'user' : 'coach'}`}>
+                  <span className="msg-label">{msg.role === 'user' ? 'You' : 'Coach'}</span>
                   {msg.text}
                 </div>
               ))
@@ -350,10 +317,7 @@ export default function AnalysisPage() {
                 }
               }}
             />
-            <button
-              onClick={handleSendChat}
-              disabled={!available || chatBusy}
-            >
+            <button onClick={handleSendChat} disabled={!available || chatBusy}>
               {chatBusy ? '...' : 'Send'}
             </button>
           </div>
@@ -439,8 +403,7 @@ function PlaybackControls() {
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(0.5);
 
-  const getVideo = () =>
-    document.getElementById('result-video') as HTMLVideoElement | null;
+  const getVideo = () => document.getElementById('result-video') as HTMLVideoElement | null;
 
   useEffect(() => {
     const v = getVideo();
@@ -493,11 +456,36 @@ function PlaybackControls() {
 
   return (
     <div className="video-controls-bar">
-      <button onClick={() => { const v = getVideo(); if (v) { v.pause(); v.currentTime = Math.max(0, v.currentTime - FRAME_DUR); } }}>‹</button>
-      <button onClick={() => { const v = getVideo(); if (v) v.paused ? v.play() : v.pause(); }}>
+      <button
+        onClick={() => {
+          const v = getVideo();
+          if (v) {
+            v.pause();
+            v.currentTime = Math.max(0, v.currentTime - FRAME_DUR);
+          }
+        }}
+      >
+        ‹
+      </button>
+      <button
+        onClick={() => {
+          const v = getVideo();
+          if (v) v.paused ? v.play() : v.pause();
+        }}
+      >
         {paused ? '▶' : '⏸'}
       </button>
-      <button onClick={() => { const v = getVideo(); if (v) { v.pause(); v.currentTime = Math.min(v.duration, v.currentTime + FRAME_DUR); } }}>›</button>
+      <button
+        onClick={() => {
+          const v = getVideo();
+          if (v) {
+            v.pause();
+            v.currentTime = Math.min(v.duration, v.currentTime + FRAME_DUR);
+          }
+        }}
+      >
+        ›
+      </button>
       <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '12px', color: '#9caaba' }}>
         {formatTime(currentTime)} / {formatTime(duration)}
       </span>
@@ -525,20 +513,14 @@ function ScorePills({ phases }: { phases: AdvicePhase[] }) {
   return (
     <div id="score-pills">
       {phases.map((phase, i) => {
-        const summary =
-          (phase.subs[0]?.text || phase.coachingNote || '').split(
-            /[.!]\s/,
-          )[0] + '.';
-        const cue = phase.coachingNote
-          ? phase.coachingNote.split(/[.!]\s/)[0] + '.'
-          : '';
+        const summary = (phase.subs[0]?.text || phase.coachingNote || '').split(/[.!]\s/)[0] + '.';
+        const cue = phase.coachingNote ? phase.coachingNote.split(/[.!]\s/)[0] + '.' : '';
         return (
           <div key={i} className={`category ${phase.status}`}>
             <div className="indicator" />
             <div className="cat-body">
               <div className="cat-title">
-                {phase.title}{' '}
-                <span className="badge">{badgeFor(phase.status)}</span>
+                {phase.title} <span className="badge">{badgeFor(phase.status)}</span>
               </div>
               <div className="cat-summary">{summary}</div>
               {cue && <div className="cat-cue">{cue}</div>}
@@ -564,13 +546,7 @@ function Priorities({ priorities }: { priorities: AdvicePriority[] }) {
   );
 }
 
-function CoachingBreakdown({
-  advice,
-  duration,
-}: {
-  advice: ParsedAdvice;
-  duration?: number;
-}) {
+function CoachingBreakdown({ advice, duration }: { advice: ParsedAdvice; duration?: number }) {
   return (
     <div className="dashboard" id="coaching-breakdown">
       {advice.overview && (
@@ -582,9 +558,7 @@ function CoachingBreakdown({
 
       {advice.phases.map((phase, pi) => {
         const cls = classFor(phase.status);
-        return (
-          <PhaseSection key={pi} phase={phase} cls={cls} />
-        );
+        return <PhaseSection key={pi} phase={phase} cls={cls} />;
       })}
 
       <Timeline phases={advice.phases} duration={duration} />
@@ -592,30 +566,19 @@ function CoachingBreakdown({
   );
 }
 
-function PhaseSection({
-  phase,
-  cls,
-}: {
-  phase: AdvicePhase;
-  cls: string;
-}) {
+function PhaseSection({ phase, cls }: { phase: AdvicePhase; cls: string }) {
   const tipCls =
     phase.status === 'good'
       ? 'good-tip'
       : phase.status === 'improve'
         ? 'improve-tip'
         : 'limited-tip';
-  const parts = phase.coachingNote
-    ? parseCoachingNote(phase.coachingNote)
-    : null;
+  const parts = phase.coachingNote ? parseCoachingNote(phase.coachingNote) : null;
 
   return (
     <>
       <div className="phase-group-header">
-        <span
-          className="indicator"
-          style={{ background: `var(--${cls})` }}
-        />
+        <span className="indicator" style={{ background: `var(--${cls})` }} />
         {phase.title}{' '}
         <span
           className="badge"
@@ -636,9 +599,7 @@ function PhaseSection({
         const stats = extractStats(sub.text);
         return (
           <div key={si} className="sub-card">
-            {sub.label && (
-              <div className="sub-card-title">{sub.label}</div>
-            )}
+            {sub.label && <div className="sub-card-title">{sub.label}</div>}
             <p>{sub.text}</p>
             {stats.length > 0 && (
               <div className="phase-stats">
@@ -676,13 +637,7 @@ function PhaseSection({
   );
 }
 
-function Timeline({
-  phases,
-  duration,
-}: {
-  phases: AdvicePhase[];
-  duration?: number;
-}) {
+function Timeline({ phases, duration }: { phases: AdvicePhase[]; duration?: number }) {
   if (!duration || phases.length < 2) return null;
 
   const timesByPhase: {
@@ -693,12 +648,9 @@ function Timeline({
   }[] = [];
 
   for (const phase of phases) {
-    const allText =
-      phase.subs.map((s) => s.text).join(' ') + ' ' + phase.coachingNote;
+    const allText = phase.subs.map((s) => s.text).join(' ') + ' ' + phase.coachingNote;
     const times: number[] = [];
-    for (const m of allText.matchAll(
-      /(?:at|by|around)\s+(\d+\.?\d*)\s*s/g,
-    )) {
+    for (const m of allText.matchAll(/(?:at|by|around)\s+(\d+\.?\d*)\s*s/g)) {
       times.push(+m[1]);
     }
     if (times.length) {
@@ -715,10 +667,7 @@ function Timeline({
 
   return (
     <div className="card phase-card" style={{ gridColumn: '1/-1' }}>
-      <div
-        className="phase-header"
-        style={{ color: 'var(--accent)' }}
-      >
+      <div className="phase-header" style={{ color: 'var(--accent)' }}>
         <span
           className="indicator"
           style={{
@@ -739,14 +688,8 @@ function Timeline({
               ? 'tl-release'
               : 'tl-follow';
           return (
-            <div
-              key={i}
-              className={`tl-phase ${cls}`}
-              style={{ flex: dur.toFixed(1) }}
-            >
-              <span className="tl-label">
-                {p.title.replace(' PHASE', '')}
-              </span>
+            <div key={i} className={`tl-phase ${cls}`} style={{ flex: dur.toFixed(1) }}>
+              <span className="tl-label">{p.title.replace(' PHASE', '')}</span>
               <span className="tl-time">{dur.toFixed(1)}s</span>
             </div>
           );
@@ -835,11 +778,7 @@ function PipelineData({ record }: { record: ResultDetailResponse }) {
         <Card
           label="Timestamp"
           value={cap.timestamp_source || 'Unknown'}
-          sub={
-            rpt.throw_detection
-              ? 'Joined-video playback time'
-              : 'Recorded sample time'
-          }
+          sub={rpt.throw_detection ? 'Joined-video playback time' : 'Recorded sample time'}
         />
       </div>
 
@@ -863,24 +802,14 @@ function PipelineData({ record }: { record: ResultDetailResponse }) {
           fraction={hf}
           sub={`${Math.round(hf * frames)} of ${frames} frames`}
         />
-        <Card
-          label="Dominant hand"
-          value={dominantHand(samples)}
-          sub="Ball–wrist association"
-        />
+        <Card label="Dominant hand" value={dominantHand(samples)} sub="Ball–wrist association" />
       </div>
 
-      <div className="drawer-section-title">
-        Hip-shoulder separation &amp; rotation
-      </div>
+      <div className="drawer-section-title">Hip-shoulder separation &amp; rotation</div>
       <div className="dashboard">
         <Card
           label="Hip-shoulder separation"
-          value={
-            sep
-              ? `${Math.round(sep.min)}° to ${Math.round(sep.max)}°`
-              : '—'
-          }
+          value={sep ? `${Math.round(sep.min)}° to ${Math.round(sep.max)}°` : '—'}
           sub={
             sep
               ? `Peak separation ${Math.round(Math.max(Math.abs(sep.min), Math.abs(sep.max)))}° · ${sep.observations} frames`
@@ -890,20 +819,12 @@ function PipelineData({ record }: { record: ResultDetailResponse }) {
         <Card
           label="Torso rotation velocity"
           value={shoulderVel ? `${Math.round(shoulderVel.peak!)}°/s` : '—'}
-          sub={
-            shoulderVel
-              ? `Peak · mean ${Math.round(shoulderVel.mean!)}°/s`
-              : 'No data'
-          }
+          sub={shoulderVel ? `Peak · mean ${Math.round(shoulderVel.mean!)}°/s` : 'No data'}
         />
         <Card
           label="Pelvic rotation velocity"
           value={hipVel ? `${Math.round(hipVel.peak!)}°/s` : '—'}
-          sub={
-            hipVel
-              ? `Peak · mean ${Math.round(hipVel.mean!)}°/s`
-              : 'No data'
-          }
+          sub={hipVel ? `Peak · mean ${Math.round(hipVel.mean!)}°/s` : 'No data'}
         />
         <Card
           label="Shoulder line range"
@@ -912,29 +833,17 @@ function PipelineData({ record }: { record: ResultDetailResponse }) {
               ? `${Math.round(shoulderLine.min)}° to ${Math.round(shoulderLine.max)}°`
               : '—'
           }
-          sub={
-            shoulderLine
-              ? `${shoulderLine.observations} frames`
-              : 'No data'
-          }
+          sub={shoulderLine ? `${shoulderLine.observations} frames` : 'No data'}
         />
         <Card
           label="Hip line range"
-          value={
-            hipLine
-              ? `${Math.round(hipLine.min)}° to ${Math.round(hipLine.max)}°`
-              : '—'
-          }
+          value={hipLine ? `${Math.round(hipLine.min)}° to ${Math.round(hipLine.max)}°` : '—'}
           sub={hipLine ? `${hipLine.observations} frames` : 'No data'}
         />
         {hipVel && shoulderVel && (
           <Card
             label="Rotation sequence"
-            value={
-              hipVel.peak! > shoulderVel.peak!
-                ? 'Pelvis leads'
-                : 'Torso leads'
-            }
+            value={hipVel.peak! > shoulderVel.peak! ? 'Pelvis leads' : 'Torso leads'}
             sub={`Pelvis peak ${Math.round(hipVel.peak!)}°/s · Torso peak ${Math.round(shoulderVel.peak!)}°/s`}
           />
         )}
@@ -956,28 +865,18 @@ function PipelineData({ record }: { record: ResultDetailResponse }) {
           value={formatColour(trk)}
           sub="Core + broad + shape + saturated"
         />
-        <Card
-          label="Mean score"
-          value={ms !== null ? ms.toFixed(2) : '—'}
-          sub="Heuristic"
-        />
-        <Card
-          label="Motion blur"
-          value={`${blur} frames`}
-          sub="Near release"
-        />
+        <Card label="Mean score" value={ms !== null ? ms.toFixed(2) : '—'} sub="Heuristic" />
+        <Card label="Motion blur" value={`${blur} frames`} sub="Near release" />
       </div>
 
       <div className="drawer-section-title">Not yet measured</div>
       <div className="dashboard">
-        {['Ball speed', 'Time to load', 'Time to release', 'Ball spin'].map(
-          (label) => (
-            <div key={label} className="card placeholder-card">
-              <div className="card-label">{label}</div>
-              <div className="card-value placeholder-value">—</div>
-            </div>
-          ),
-        )}
+        {['Ball speed', 'Time to load', 'Time to release', 'Ball spin'].map((label) => (
+          <div key={label} className="card placeholder-card">
+            <div className="card-label">{label}</div>
+            <div className="card-value placeholder-value">—</div>
+          </div>
+        ))}
       </div>
 
       {lims.length > 0 && (
@@ -997,23 +896,13 @@ function PipelineData({ record }: { record: ResultDetailResponse }) {
 
       <div className="drawer-section-title">Downloads</div>
       <div className="downloads-row">
-        <a
-          className="download-link"
-          href={`/results/${record.id}/data.json`}
-          download
-        >
+        <a className="download-link" href={`/results/${record.id}/data.json`} download>
           Pipeline JSON
         </a>
-        <a
-          className="download-link"
-          href={`/results/${record.id}/${record.original}`}
-        >
+        <a className="download-link" href={`/results/${record.id}/${record.original}`}>
           Original video
         </a>
-        <a
-          className="download-link"
-          href={`/results/${record.id}/${record.processed}`}
-        >
+        <a className="download-link" href={`/results/${record.id}/${record.processed}`}>
           Processed video
         </a>
       </div>
@@ -1021,15 +910,7 @@ function PipelineData({ record }: { record: ResultDetailResponse }) {
   );
 }
 
-function Card({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-}) {
+function Card({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="card">
       <div className="card-label">{label}</div>
@@ -1057,10 +938,7 @@ function BarCard({
         {value}
       </div>
       <div className="stat-bar">
-        <div
-          className="fill"
-          style={{ width: `${Math.round(fraction * 100)}%` }}
-        />
+        <div className="fill" style={{ width: `${Math.round(fraction * 100)}%` }} />
       </div>
       {sub && <div className="card-sub">{sub}</div>}
     </div>
@@ -1086,10 +964,7 @@ function TrajectoryCanvas({
     ctx.strokeStyle = '#c5f36b';
     ctx.lineWidth = 2;
 
-    const scale = Math.min(
-      (canvas.width - 20) / cs.width,
-      (canvas.height - 20) / cs.height,
-    );
+    const scale = Math.min((canvas.width - 20) / cs.width, (canvas.height - 20) / cs.height);
     const ox = (canvas.width - cs.width * scale) / 2;
     const oy = (canvas.height - cs.height * scale) / 2;
 
@@ -1133,12 +1008,5 @@ function TrajectoryCanvas({
     }
   }, [samples, cs]);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="path-canvas"
-      width={500}
-      height={80}
-    />
-  );
+  return <canvas ref={canvasRef} className="path-canvas" width={500} height={80} />;
 }

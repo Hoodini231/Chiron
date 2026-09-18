@@ -51,11 +51,8 @@ export default function CapturePage() {
 
   // Frame stats subscription
   const frameStats = useSyncExternalStore(
-    useCallback(
-      (cb: () => void) => serviceRef.current?.subscribe(cb) ?? (() => {}),
-      [],
-    ),
-    useCallback(() => serviceRef.current?.frameStats ?? initialState as never, []),
+    useCallback((cb: () => void) => serviceRef.current?.subscribe(cb) ?? (() => {}), []),
+    useCallback(() => serviceRef.current?.frameStats ?? (initialState as never), []),
   );
 
   const config = serviceRef.current?.currentConfig;
@@ -253,10 +250,7 @@ export default function CapturePage() {
     const rect = canvasRef.current.getBoundingClientRect();
     const scaleX = canvasRef.current.width / rect.width;
     const scaleY = canvasRef.current.height / rect.height;
-    svc.sampleColour(
-      (e.clientX - rect.left) * scaleX,
-      (e.clientY - rect.top) * scaleY,
-    );
+    svc.sampleColour((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
   };
 
   const handleWindowUpdate = (windows: ThrowWindow[]) => {
@@ -279,7 +273,14 @@ export default function CapturePage() {
 
         {!hasSource && (
           <div id="empty" style={{ position: 'absolute', textAlign: 'center', padding: 25 }}>
-            <h1 style={{ fontSize: 'clamp(24px, 3vw, 42px)', fontWeight: 500, letterSpacing: '-0.04em', margin: '0 0 15px' }}>
+            <h1
+              style={{
+                fontSize: 'clamp(24px, 3vw, 42px)',
+                fontWeight: 500,
+                letterSpacing: '-0.04em',
+                margin: '0 0 15px',
+              }}
+            >
               Chiron
             </h1>
             <p style={{ fontSize: 16, color: '#9cacbe', marginBottom: 24 }}>
@@ -301,17 +302,28 @@ export default function CapturePage() {
         )}
 
         <div className="video-header">
-          <span>{state.source === 'camera' ? 'LIVE CAMERA' : state.source === 'upload' ? 'UPLOADED VIDEO' : ''}</span>
+          <span>
+            {state.source === 'camera'
+              ? 'LIVE CAMERA'
+              : state.source === 'upload'
+                ? 'UPLOADED VIDEO'
+                : ''}
+          </span>
           <a href="#/results">Results →</a>
         </div>
 
         <div className="video-controls">
           <div>
             {state.phase === 'scanning' && state.scanProgress && (
-              <span>Finding throws · {state.scanProgress.current.toFixed(1)}s / {state.scanProgress.total.toFixed(1)}s</span>
+              <span>
+                Finding throws · {state.scanProgress.current.toFixed(1)}s /{' '}
+                {state.scanProgress.total.toFixed(1)}s
+              </span>
             )}
             {state.phase === 'processing' && state.processProgress && (
-              <span>Processing · {state.processProgress.done} / {state.processProgress.total} frames</span>
+              <span>
+                Processing · {state.processProgress.done} / {state.processProgress.total} frames
+              </span>
             )}
             {state.phase === 'saving' && <span>{state.saveStep}</span>}
             {state.phase === 'saved' && (
@@ -340,10 +352,7 @@ export default function CapturePage() {
                   {uploadJobRef.current ? 'Cancel' : '■ Stop'}
                 </button>
                 {state.source === 'upload' && (
-                  <button
-                    onClick={handleEnableCamera}
-                    disabled={active || state.opening}
-                  >
+                  <button onClick={handleEnableCamera} disabled={active || state.opening}>
                     Use camera
                   </button>
                 )}
@@ -364,7 +373,8 @@ export default function CapturePage() {
           )}
           {!state.errorMessage && state.phase === 'loading' && (
             <p id="status" style={{ color: '#a5b3c2', fontSize: 13, margin: 0, flexBasis: '100%' }}>
-              Loading pipelines... Ball: {state.pipelines.ball ? '✓' : '...'} Pose: {state.pipelines.pose ? '✓' : '...'} Hands: {state.pipelines.hands ? '✓' : '...'}
+              Loading pipelines... Ball: {state.pipelines.ball ? '✓' : '...'} Pose:{' '}
+              {state.pipelines.pose ? '✓' : '...'} Hands: {state.pipelines.hands ? '✓' : '...'}
             </p>
           )}
         </div>
@@ -413,9 +423,7 @@ export default function CapturePage() {
             min="5"
             max="40"
             value={config?.tolerance ?? 14}
-            onChange={(e) =>
-              handleConfigChange({ tolerance: parseInt(e.target.value) })
-            }
+            onChange={(e) => handleConfigChange({ tolerance: parseInt(e.target.value) })}
             disabled={active}
           />
 
@@ -428,9 +436,7 @@ export default function CapturePage() {
             min="30"
             max="255"
             value={config?.saturation ?? 140}
-            onChange={(e) =>
-              handleConfigChange({ saturation: parseInt(e.target.value) })
-            }
+            onChange={(e) => handleConfigChange({ saturation: parseInt(e.target.value) })}
             disabled={active}
           />
 
@@ -438,9 +444,7 @@ export default function CapturePage() {
             <input
               type="checkbox"
               checked={config?.isolate ?? true}
-              onChange={(e) =>
-                handleConfigChange({ isolate: e.target.checked })
-              }
+              onChange={(e) => handleConfigChange({ isolate: e.target.checked })}
               disabled={active}
             />
             Show isolation overlay
@@ -534,11 +538,7 @@ function ThrowReview({
     onUpdate(windows.filter((_, i) => i !== index));
   };
 
-  const handleChange = (
-    index: number,
-    field: 'start_s' | 'end_s',
-    value: number,
-  ) => {
+  const handleChange = (index: number, field: 'start_s' | 'end_s', value: number) => {
     const updated = windows.map((w, i) =>
       i === index ? { ...w, [field]: value, edited: true } : w,
     );
@@ -572,11 +572,7 @@ function ThrowReview({
           <fieldset key={i} className="throw-window">
             <legend>
               Throw {i + 1}
-              {w.edited
-                ? ' · edited'
-                : w.estimates?.length
-                  ? ' · estimated'
-                  : ' · manual'}
+              {w.edited ? ' · edited' : w.estimates?.length ? ' · estimated' : ' · manual'}
             </legend>
             <label>
               Start (s)
@@ -585,9 +581,7 @@ function ThrowReview({
                 step="0.001"
                 min="0"
                 value={w.start_s}
-                onChange={(e) =>
-                  handleChange(i, 'start_s', parseFloat(e.target.value))
-                }
+                onChange={(e) => handleChange(i, 'start_s', parseFloat(e.target.value))}
                 disabled={disabled}
               />
             </label>
@@ -598,24 +592,14 @@ function ThrowReview({
                 step="0.001"
                 min="0"
                 value={w.end_s}
-                onChange={(e) =>
-                  handleChange(i, 'end_s', parseFloat(e.target.value))
-                }
+                onChange={(e) => handleChange(i, 'end_s', parseFloat(e.target.value))}
                 disabled={disabled}
               />
             </label>
-            <button
-              type="button"
-              onClick={() => handlePreview(w)}
-              disabled={disabled}
-            >
+            <button type="button" onClick={() => handlePreview(w)} disabled={disabled}>
               Preview throw
             </button>
-            <button
-              type="button"
-              onClick={() => handleRemove(i)}
-              disabled={disabled}
-            >
+            <button type="button" onClick={() => handleRemove(i)} disabled={disabled}>
               Remove
             </button>
           </fieldset>

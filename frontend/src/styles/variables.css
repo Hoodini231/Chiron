@@ -27,7 +27,6 @@
   --tag-text: #96a4b5;
 
   /* Typography */
-  --font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', sans-serif;
+  --font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, monospace;
 }

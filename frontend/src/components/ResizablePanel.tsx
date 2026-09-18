@@ -32,8 +32,7 @@ export default function ResizablePanel({
   );
 
   useEffect(() => {
-    const onMouseMove = (e: MouseEvent) =>
-      handleMove(e.clientX, e.clientY);
+    const onMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY);
     const onTouchMove = (e: TouchEvent) => {
       if (activeRef.current) {
         handleMove(e.touches[0].clientX, e.touches[0].clientY);
@@ -61,17 +60,10 @@ export default function ResizablePanel({
 
   const onStart = (e: React.MouseEvent | React.TouchEvent) => {
     activeRef.current = true;
-    document.body.style.cursor =
-      axis === 'col' ? 'col-resize' : 'row-resize';
+    document.body.style.cursor = axis === 'col' ? 'col-resize' : 'row-resize';
     document.body.style.userSelect = 'none';
     e.preventDefault();
   };
 
-  return (
-    <div
-      className={`gutter gutter-${axis}`}
-      onMouseDown={onStart}
-      onTouchStart={onStart}
-    />
-  );
+  return <div className={`gutter gutter-${axis}`} onMouseDown={onStart} onTouchStart={onStart} />;
 }

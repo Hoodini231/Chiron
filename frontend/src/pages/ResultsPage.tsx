@@ -45,9 +45,7 @@ export default function ResultsPage() {
         if (!list.results.length) return;
 
         const requestedId = id;
-        const validId =
-          list.results.find((r) => r.id === requestedId)?.id ??
-          list.results[0].id;
+        const validId = list.results.find((r) => r.id === requestedId)?.id ?? list.results[0].id;
 
         if (!requestedId || requestedId !== validId) {
           navigate(`/results/${validId}`, { replace: true });
@@ -59,22 +57,19 @@ export default function ResultsPage() {
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadResult = useCallback(
-    async (resultId: string) => {
-      const token = ++loadTokenRef.current;
-      setCurrent(null);
-      setChatStatus('');
-      try {
-        const record = await api.getResult(resultId);
-        if (token !== loadTokenRef.current) return;
-        setCurrent(record);
-      } catch (err) {
-        if (token !== loadTokenRef.current) return;
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    },
-    [],
-  );
+  const loadResult = useCallback(async (resultId: string) => {
+    const token = ++loadTokenRef.current;
+    setCurrent(null);
+    setChatStatus('');
+    try {
+      const record = await api.getResult(resultId);
+      if (token !== loadTokenRef.current) return;
+      setCurrent(record);
+    } catch (err) {
+      if (token !== loadTokenRef.current) return;
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
 
   useEffect(() => {
     if (id && recordings.length > 0) {
@@ -92,9 +87,7 @@ export default function ResultsPage() {
     setAdviceBusy(true);
     try {
       const advice = await api.getAdvice(resultId);
-      setCurrent((prev) =>
-        prev?.id === resultId ? { ...prev, advice } : prev,
-      );
+      setCurrent((prev) => (prev?.id === resultId ? { ...prev, advice } : prev));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -108,9 +101,7 @@ export default function ResultsPage() {
     setChatStatus('Coach is replying...');
     try {
       const chat = await api.sendChat(resultId, message);
-      setCurrent((prev) =>
-        prev?.id === resultId ? { ...prev, chat } : prev,
-      );
+      setCurrent((prev) => (prev?.id === resultId ? { ...prev, chat } : prev));
       setChatStatus('Conversation saved.');
     } catch (err) {
       setChatStatus(err instanceof Error ? err.message : String(err));
@@ -157,14 +148,10 @@ export default function ResultsPage() {
       <section className="video-pane results-pane">
         {current ? (
           <>
-            <VideoPlayer
-              src={`/results/${current.id}/${current.processed}`}
-            />
+            <VideoPlayer src={`/results/${current.id}/${current.processed}`} />
             <div className="result-nav">
               <a href="#/capture">← Record a throw</a>
-              <a href={`/results/${current.id}/${current.original}`}>
-                Original video ↗
-              </a>
+              <a href={`/results/${current.id}/${current.original}`}>Original video ↗</a>
               <a href={`#/analysis/${current.id}`}>Analysis view ↗</a>
             </div>
           </>
@@ -206,8 +193,7 @@ export default function ResultsPage() {
             {recordings.length === 0 && <option>No recordings yet</option>}
             {recordings.map((r) => (
               <option key={r.id} value={r.id}>
-                {new Date(r.created_at).toLocaleString()} ·{' '}
-                {r.metrics.duration_s.toFixed(1)}s
+                {new Date(r.created_at).toLocaleString()} · {r.metrics.duration_s.toFixed(1)}s
               </option>
             ))}
           </select>
@@ -215,10 +201,7 @@ export default function ResultsPage() {
           {m && (
             <div className="stats">
               {current?.report.throw_detection &&
-                stat(
-                  'Throws',
-                  String(current.report.throw_detection.segments.length),
-                )}
+                stat('Throws', String(current.report.throw_detection.segments.length))}
               {current?.report.capture.original_duration_s != null &&
                 current.report.throw_detection &&
                 stat(
@@ -230,26 +213,18 @@ export default function ResultsPage() {
               {stat('Ball visible', percent(m.ball_detection_fraction))}
               {stat('Body detected', percent(m.pose_detection_fraction))}
               {stat('Hands detected', percent(m.hand_detection_fraction))}
-              {stat(
-                'Left elbow · 2D',
-                angleRange(m.projected_angles_deg?.left_elbow_deg),
-              )}
-              {stat(
-                'Right elbow · 2D',
-                angleRange(m.projected_angles_deg?.right_elbow_deg),
-              )}
+              {stat('Left elbow · 2D', angleRange(m.projected_angles_deg?.left_elbow_deg))}
+              {stat('Right elbow · 2D', angleRange(m.projected_angles_deg?.right_elbow_deg))}
             </div>
           )}
 
           {current && (
             <div>
-              <span className="chart-label">
-                Observed ball path · image plane
-              </span>
+              <span className="chart-label">Observed ball path · image plane</span>
               <TrajectoryChart record={current} />
               <p className="metric-note">
-                Joint-angle ranges cover the whole clip. Speed and load/release
-                timing are not yet measured.
+                Joint-angle ranges cover the whole clip. Speed and load/release timing are not yet
+                measured.
               </p>
               <a
                 href={`/results/${current.id}/data.json`}
@@ -334,10 +309,7 @@ function TrajectoryChart({ record }: { record: ResultDetailResponse }) {
     ctx.strokeStyle = '#c5f36b';
     ctx.lineWidth = 2;
 
-    const scale = Math.min(
-      (canvas.width - 20) / dim.width,
-      (canvas.height - 20) / dim.height,
-    );
+    const scale = Math.min((canvas.width - 20) / dim.width, (canvas.height - 20) / dim.height);
     const ox = (canvas.width - dim.width * scale) / 2;
     const oy = (canvas.height - dim.height * scale) / 2;
 
@@ -381,12 +353,5 @@ function TrajectoryChart({ record }: { record: ResultDetailResponse }) {
     }
   }, [record]);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="chart"
-      width={500}
-      height={160}
-    />
-  );
+  return <canvas ref={canvasRef} className="chart" width={500} height={160} />;
 }

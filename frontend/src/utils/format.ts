@@ -8,10 +8,6 @@ export function percent(n: number | null | undefined): string {
   return `${Math.round((n ?? 0) * 100)}%`;
 }
 
-export function angleRange(
-  value: { min: number; max: number } | null | undefined,
-): string {
-  return value
-    ? `${Math.round(value.min)}–${Math.round(value.max)}°`
-    : 'Unavailable';
+export function angleRange(value: { min: number; max: number } | null | undefined): string {
+  return value ? `${Math.round(value.min)}–${Math.round(value.max)}°` : 'Unavailable';
 }

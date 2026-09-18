@@ -169,23 +169,17 @@ export class ProcessingService {
     this.sctx = this.small.getContext('2d', { willReadFrequently: true });
     this.rawContext = this.rawFrame.getContext('2d');
 
-    await Promise.all([
-      this.loadTracker(),
-      this.loadPose(),
-      this.loadHands(),
-      this.loadModules(),
-    ]);
+    await Promise.all([this.loadTracker(), this.loadPose(), this.loadHands(), this.loadModules()]);
   }
 
   private async loadModules() {
-    const [features, handFeat, throwWin, uploadProc, videoWriter] =
-      await Promise.all([
-        import('@pipelines/features.js' /* @vite-ignore */),
-        import('@pipelines/hand-features.js' /* @vite-ignore */),
-        import('@pipelines/throw-windows.js' /* @vite-ignore */),
-        import('@pipelines/upload-processing.js' /* @vite-ignore */),
-        import('@pipelines/video-writer.js' /* @vite-ignore */),
-      ]);
+    const [features, handFeat, throwWin, uploadProc, videoWriter] = await Promise.all([
+      import('@pipelines/features.js' /* @vite-ignore */),
+      import('@pipelines/hand-features.js' /* @vite-ignore */),
+      import('@pipelines/throw-windows.js' /* @vite-ignore */),
+      import('@pipelines/upload-processing.js' /* @vite-ignore */),
+      import('@pipelines/video-writer.js' /* @vite-ignore */),
+    ]);
     this.modules.poseFeatures = features.poseFeatures;
     this.modules.summarize = features.summarize;
     this.modules.handFeatures = handFeat.handFeatures;
@@ -234,7 +228,8 @@ export class ProcessingService {
       this.tracker = new trackerMod.BallTracker(cv);
 
       this._pipelineStatus = { ...this._pipelineStatus, ball: true };
-      this._ready = this._pipelineStatus.ball && this._pipelineStatus.pose && this._pipelineStatus.hands;
+      this._ready =
+        this._pipelineStatus.ball && this._pipelineStatus.pose && this._pipelineStatus.hands;
       this._frameStats = { ...this._frameStats, ballState: 'Ready' };
       this.notify();
     } catch {
@@ -251,7 +246,8 @@ export class ProcessingService {
       this.poseTracker = await poseMod.createPoseTracker();
 
       this._pipelineStatus = { ...this._pipelineStatus, pose: true };
-      this._ready = this._pipelineStatus.ball && this._pipelineStatus.pose && this._pipelineStatus.hands;
+      this._ready =
+        this._pipelineStatus.ball && this._pipelineStatus.pose && this._pipelineStatus.hands;
       this._frameStats = { ...this._frameStats, bodyState: 'Ready' };
       this.notify();
     } catch {
@@ -269,7 +265,8 @@ export class ProcessingService {
       this.handTracker = await handsMod.createHandTracker();
 
       this._pipelineStatus = { ...this._pipelineStatus, hands: true };
-      this._ready = this._pipelineStatus.ball && this._pipelineStatus.pose && this._pipelineStatus.hands;
+      this._ready =
+        this._pipelineStatus.ball && this._pipelineStatus.pose && this._pipelineStatus.hands;
       this._frameStats = { ...this._frameStats, handState: 'Ready' };
       this.notify();
     } catch {
@@ -350,9 +347,7 @@ export class ProcessingService {
     this.rawFrame.width = this.canvas.width;
     this.rawFrame.height = this.canvas.height;
     this.small.width = Math.min(640, this.canvas.width);
-    this.small.height = Math.round(
-      (this.canvas.height * this.small.width) / this.canvas.width,
-    );
+    this.small.height = Math.round((this.canvas.height * this.small.width) / this.canvas.width);
 
     this.lastFrame = -1;
     this.scheduleFrame();
@@ -361,16 +356,11 @@ export class ProcessingService {
 
   async loadVideo(file: File): Promise<void> {
     if (this.destroyed) return;
-    if (file.size > 160 * 1024 * 1024)
-      throw new Error('Choose a video smaller than 160 MB.');
+    if (file.size > 160 * 1024 * 1024) throw new Error('Choose a video smaller than 160 MB.');
 
     const type =
       file.type ||
-      (/\.mp4$/i.test(file.name)
-        ? 'video/mp4'
-        : /\.webm$/i.test(file.name)
-          ? 'video/webm'
-          : '');
+      (/\.mp4$/i.test(file.name) ? 'video/mp4' : /\.webm$/i.test(file.name) ? 'video/webm' : '');
     if (!['video/mp4', 'video/webm'].includes(type))
       throw new Error('Choose an MP4 or WebM video.');
 
@@ -383,10 +373,7 @@ export class ProcessingService {
 
     await new Promise<void>((resolve, reject) => {
       const v = this.video!;
-      const timer = setTimeout(
-        () => reject(new Error('Video decode timed out.')),
-        15000,
-      );
+      const timer = setTimeout(() => reject(new Error('Video decode timed out.')), 15000);
       const cleanup = () => {
         clearTimeout(timer);
         v.removeEventListener('loadeddata', done);
@@ -419,9 +406,7 @@ export class ProcessingService {
     this.rawFrame.width = this.canvas.width;
     this.rawFrame.height = this.canvas.height;
     this.small.width = Math.min(640, this.canvas.width);
-    this.small.height = Math.round(
-      (this.canvas.height * this.small.width) / this.canvas.width,
-    );
+    this.small.height = Math.round((this.canvas.height * this.small.width) / this.canvas.width);
 
     this.processFrame(performance.now(), {
       mediaTime: this.video.currentTime,
@@ -459,8 +444,7 @@ export class ProcessingService {
     if (!this.stream || !this.video) return;
     if (this.video.requestVideoFrameCallback) {
       this.frameHandle = this.video.requestVideoFrameCallback(
-        (now: number, metadata: { mediaTime: number }) =>
-          this.onFrame(now, metadata),
+        (now: number, metadata: { mediaTime: number }) => this.onFrame(now, metadata),
       );
     } else {
       this.frameHandle = requestAnimationFrame((now) =>
@@ -496,30 +480,11 @@ export class ProcessingService {
 
     const dt = (now - this.lastWall) / 1000;
     this.lastWall = now;
-    if (dt > 0 && dt < 1)
-      this.fps = this.fps ? this.fps * 0.9 + (1 / dt) * 0.1 : 1 / dt;
+    if (dt > 0 && dt < 1) this.fps = this.fps ? this.fps * 0.9 + (1 / dt) * 0.1 : 1 / dt;
 
-    this.rawContext!.drawImage(
-      this.video,
-      0,
-      0,
-      this.rawFrame.width,
-      this.rawFrame.height,
-    );
-    this.ctx.drawImage(
-      this.rawFrame,
-      0,
-      0,
-      this.canvas.width,
-      this.canvas.height,
-    );
-    this.sctx!.drawImage(
-      this.rawFrame,
-      0,
-      0,
-      this.small.width,
-      this.small.height,
-    );
+    this.rawContext!.drawImage(this.video, 0, 0, this.rawFrame.width, this.rawFrame.height);
+    this.ctx.drawImage(this.rawFrame, 0, 0, this.canvas.width, this.canvas.height);
+    this.sctx!.drawImage(this.rawFrame, 0, 0, this.small.width, this.small.height);
 
     let ball: AnyModule = null;
     let pose: AnyModule = null;
@@ -531,17 +496,12 @@ export class ProcessingService {
           ? this.mlTimestamp + (detailed ? 1000 / 30 : 1000 / 15)
           : Math.max(this.mlTimestamp + 0.001, now);
 
-        pose =
-          this.poseTracker.detectForVideo(this.small, this.mlTimestamp)
-            .landmarks[0] ?? null;
+        pose = this.poseTracker.detectForVideo(this.small, this.mlTimestamp).landmarks[0] ?? null;
 
         hands = detailed
           ? this.modules.handFeatures!(
               this.modules.collectHands!(
-                this.handTracker.detectForVideo(
-                  this.rawFrame,
-                  this.mlTimestamp,
-                ),
+                this.handTracker.detectForVideo(this.rawFrame, this.mlTimestamp),
               ),
               pose,
               this.canvas.width,
@@ -556,13 +516,7 @@ export class ProcessingService {
         });
 
         if (this.config.isolate)
-          this.ctx.drawImage(
-            this.isolatedFrame,
-            0,
-            0,
-            this.canvas.width,
-            this.canvas.height,
-          );
+          this.ctx.drawImage(this.isolatedFrame, 0, 0, this.canvas.width, this.canvas.height);
       } catch (e) {
         if (offline)
           throw new Error(
@@ -573,18 +527,8 @@ export class ProcessingService {
     }
 
     // Draw overlays
-    this.modules.drawPose?.(
-      this.ctx,
-      pose,
-      this.canvas.width,
-      this.canvas.height,
-    );
-    this.modules.drawHands?.(
-      this.ctx,
-      hands,
-      this.canvas.width,
-      this.canvas.height,
-    );
+    this.modules.drawPose?.(this.ctx, pose, this.canvas.width, this.canvas.height);
+    this.modules.drawHands?.(this.ctx, hands, this.canvas.width, this.canvas.height);
 
     // Ball trail
     if (ball) {
@@ -608,9 +552,7 @@ export class ProcessingService {
     this.ctx.strokeStyle = '#c5f36b';
     this.ctx.lineWidth = Math.max(2, this.canvas.width / 400);
     this.ctx.beginPath();
-    this.trail.forEach((p, i) =>
-      i ? this.ctx!.lineTo(p.x, p.y) : this.ctx!.moveTo(p.x, p.y),
-    );
+    this.trail.forEach((p, i) => (i ? this.ctx!.lineTo(p.x, p.y) : this.ctx!.moveTo(p.x, p.y)));
     this.ctx.stroke();
 
     if (ball) {
@@ -649,11 +591,7 @@ export class ProcessingService {
       this.ctx.fillRect(12, 12, 360, 42);
       this.ctx.fillStyle = '#c5f36b';
       this.ctx.font = '18px monospace';
-      this.ctx.fillText(
-        `THROW ${outputFrame.throw_id} · ${outputFrame.t_s.toFixed(2)}s`,
-        24,
-        39,
-      );
+      this.ctx.fillText(`THROW ${outputFrame.throw_id} · ${outputFrame.t_s.toFixed(2)}s`, 24, 39);
     }
 
     // Recording HUD
@@ -667,7 +605,12 @@ export class ProcessingService {
       this.ctx.font = `${size}px monospace`;
       this.ctx.fillStyle = '#c5f36b';
       this.ctx.fillText(
-        `REC ${Math.floor(elapsed / 60).toString().padStart(2, '0')}:${(elapsed % 60).toFixed(1).padStart(4, '0')} · ${ball ? 'BALL DETECTED' : 'BALL NOT VISIBLE'}`,
+        `REC ${Math.floor(elapsed / 60)
+          .toString()
+          .padStart(
+            2,
+            '0',
+          )}:${(elapsed % 60).toFixed(1).padStart(4, '0')} · ${ball ? 'BALL DETECTED' : 'BALL NOT VISIBLE'}`,
         24,
         12 + size * 1.4,
       );
@@ -719,11 +662,7 @@ export class ProcessingService {
           visibility: p.visibility,
           presence: p.presence,
         })) ?? null,
-      features_2d: this.modules.poseFeatures?.(
-        pose,
-        this.canvas.width,
-        this.canvas.height,
-      ) ?? null,
+      features_2d: this.modules.poseFeatures?.(pose, this.canvas.width, this.canvas.height) ?? null,
       hands,
     };
 
@@ -776,8 +715,7 @@ export class ProcessingService {
 
   // Recording
   startRecording(): void {
-    if (!this._ready || !(this.stream || this.uploadedFile) || !this.canvas)
-      return;
+    if (!this._ready || !(this.stream || this.uploadedFile) || !this.canvas) return;
 
     const processedStream = this.canvas.captureStream(0);
     const processedChunks: Blob[] = [];
@@ -818,9 +756,7 @@ export class ProcessingService {
       origin: null,
       startWall: performance.now(),
       config: { ...this.config },
-      cameraSettings: this.stream
-        ? this.stream.getVideoTracks()[0].getSettings()
-        : {},
+      cameraSettings: this.stream ? this.stream.getVideoTracks()[0].getSettings() : {},
     };
 
     processedRecorder.start(1000);
@@ -859,9 +795,7 @@ export class ProcessingService {
       samples: r.samples,
       config: r.config,
       cameraSettings: r.cameraSettings,
-      duration: r.samples.length
-        ? r.samples[r.samples.length - 1].t_s
-        : 0,
+      duration: r.samples.length ? r.samples[r.samples.length - 1].t_s : 0,
       origin: r.origin ?? 0,
     };
   }
@@ -879,23 +813,21 @@ export class ProcessingService {
     detailed: boolean,
     outputFrame: { throw_id: number; t_s: number } | null,
   ) {
-    return this.processFrame(performance.now(), { mediaTime: t }, {
-      offline: true,
-      detailed,
-      outputFrame,
-    });
+    return this.processFrame(
+      performance.now(),
+      { mediaTime: t },
+      {
+        offline: true,
+        detailed,
+        outputFrame,
+      },
+    );
   }
 
-  async scanThrows(
-    signal: AbortSignal,
-    onProgress: (current: number, total: number) => void,
-  ) {
+  async scanThrows(signal: AbortSignal, onProgress: (current: number, total: number) => void) {
     if (!this.video || !this._ready || !this.modules.scanThrows) return [];
 
-    await this.modules.checkEncoderSupport?.(
-      this.canvas!.width,
-      this.canvas!.height,
-    );
+    await this.modules.checkEncoderSupport?.(this.canvas!.width, this.canvas!.height);
 
     return this.modules.scanThrows({
       video: this.video,
@@ -912,8 +844,7 @@ export class ProcessingService {
     signal: AbortSignal,
     onProgress: (done: number, total: number) => void,
   ): Promise<ProcessedResult> {
-    if (!this.video || !this._ready || !this.modules.processThrows)
-      throw new Error('Not ready');
+    if (!this.video || !this._ready || !this.modules.processThrows) throw new Error('Not ready');
 
     return this.modules.processThrows({
       video: this.video,
@@ -922,8 +853,7 @@ export class ProcessingService {
         this.uploadAnalysis(t, detailed, outputFrame),
       reset: () => this.resetUploadTracking(),
       signal,
-      createWriter: () =>
-        this.modules.createVideoWriter!(this.canvas!),
+      createWriter: () => this.modules.createVideoWriter!(this.canvas!),
       progress: onProgress,
     });
   }
@@ -957,8 +887,7 @@ export class ProcessingService {
         processed_segment_s: [0, +duration.toFixed(6)],
       },
       tracking: {
-        method:
-          'opencv_colour_segmentation_and_validated_circle_edges',
+        method: 'opencv_colour_segmentation_and_validated_circle_edges',
         colour: config.colour,
         hue: config.hue,
         tolerance: config.tolerance,
