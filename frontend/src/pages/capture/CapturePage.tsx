@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react';
 import * as api from '../../api/client';
 import { ProcessingService } from '../../services/processing';
 import type { ThrowWindow, TrackingConfig } from '../../types/capture';
@@ -19,7 +19,6 @@ export default function CapturePage() {
   const uploadJobRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize service
   useEffect(() => {
     const svc = new ProcessingService();
     serviceRef.current = svc;
@@ -39,7 +38,6 @@ export default function CapturePage() {
     };
   }, []);
 
-  // Attach video/canvas once refs are ready
   useEffect(() => {
     const svc = serviceRef.current;
     if (svc && videoRef.current && canvasRef.current) {
@@ -47,20 +45,20 @@ export default function CapturePage() {
     }
   }, []);
 
-  // Frame stats subscription
   const frameStats = useSyncExternalStore(
     useCallback((cb: () => void) => serviceRef.current?.subscribe(cb) ?? (() => {}), []),
-    useCallback(() => serviceRef.current?.frameStats ?? (initialState as never), []),
+    useCallback(() => serviceRef.current?.frameStats ?? initialState as never, []),
   );
 
-  const config = serviceRef.current?.currentConfig;
+  const [config, setConfig] = useState({
+    colour: 'red', hue: 0, tolerance: 14, saturation: 140, isolate: true,
+  });
   const active =
     state.phase === 'recording' ||
     state.phase === 'scanning' ||
     state.phase === 'processing' ||
     state.phase === 'saving';
 
-  // Handlers
   const handleEnableCamera = async () => {
     const svc = serviceRef.current;
     if (!svc || state.opening || active) return;
@@ -69,10 +67,7 @@ export default function CapturePage() {
       await svc.openCamera();
       dispatch({ type: 'CAMERA_OPENED' });
     } catch (e) {
-      dispatch({
-        type: 'OPEN_FAILED',
-        message: e instanceof Error ? e.message : String(e),
-      });
+      dispatch({ type: 'OPEN_FAILED', message: e instanceof Error ? e.message : String(e) });
     }
   };
 
@@ -84,22 +79,14 @@ export default function CapturePage() {
       await svc.loadVideo(file);
       dispatch({ type: 'VIDEO_UPLOADED' });
     } catch (e) {
-      dispatch({
-        type: 'OPEN_FAILED',
-        message: e instanceof Error ? e.message : String(e),
-      });
+      dispatch({ type: 'OPEN_FAILED', message: e instanceof Error ? e.message : String(e) });
     }
   };
 
   const handleStartRecording = () => {
     const svc = serviceRef.current;
     if (!svc?.ready || active) return;
-
-    if (state.source === 'upload') {
-      handleFindThrows();
-      return;
-    }
-
+    if (state.source === 'upload') { handleFindThrows(); return; }
     svc.startRecording();
     dispatch({ type: 'RECORDING_STARTED' });
   };
@@ -107,18 +94,15 @@ export default function CapturePage() {
   const handleStopRecording = async () => {
     const svc = serviceRef.current;
     if (!svc) return;
-
     if (uploadJobRef.current) {
       uploadJobRef.current.abort();
       uploadJobRef.current = null;
       dispatch({ type: 'CANCEL' });
       return;
     }
-
     const result = await svc.stopRecording();
     dispatch({ type: 'RECORDING_STOPPED' });
     if (!result) return;
-
     const report = svc.makeReport(result);
     await saveResult(report, result.processedBlob, result.rawBlob);
   };
@@ -136,10 +120,7 @@ export default function CapturePage() {
       dispatch({ type: 'SCAN_COMPLETE', windows });
     } catch (e) {
       if (!controller.signal.aborted) {
-        dispatch({
-          type: 'SCAN_FAILED',
-          message: e instanceof Error ? e.message : String(e),
-        });
+        dispatch({ type: 'SCAN_FAILED', message: e instanceof Error ? e.message : String(e) });
       } else {
         dispatch({ type: 'CANCEL' });
       }
@@ -156,14 +137,12 @@ export default function CapturePage() {
     dispatch({ type: 'PROCESS_STARTED' });
     try {
       const processed = await svc.processThrows(
-        state.throwWindows,
-        controller.signal,
-        (done, total) => {
-          dispatch({ type: 'PROCESS_PROGRESS', done, total });
-        },
+        state.throwWindows, controller.signal,
+        (done, total) => { dispatch({ type: 'PROCESS_PROGRESS', done, total }); },
       );
       dispatch({ type: 'PROCESS_COMPLETE' });
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const svcUploadedFile = (svc as any).uploadedFile as File | null;
       const result = {
         processedBlob: processed.blob,
@@ -184,6 +163,7 @@ export default function CapturePage() {
           timestamp_source: 'source_video_seek',
         });
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (report as any).throw_detection = {
         version: 'motion_windows_v1',
         is_heuristic: true,
@@ -194,10 +174,7 @@ export default function CapturePage() {
       await saveResult(report, processed.blob, svcUploadedFile ?? new Blob([]));
     } catch (e) {
       if (!controller.signal.aborted) {
-        dispatch({
-          type: 'PROCESS_FAILED',
-          message: e instanceof Error ? e.message : String(e),
-        });
+        dispatch({ type: 'PROCESS_FAILED', message: e instanceof Error ? e.message : String(e) });
       } else {
         dispatch({ type: 'CANCEL' });
       }
@@ -206,13 +183,14 @@ export default function CapturePage() {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const saveResult = async (report: any, processedBlob: Blob, rawBlob: Blob) => {
     dispatch({ type: 'SAVE_PROGRESS', step: 'Creating record...' });
     try {
       const manifest = await api.saveResult(
         report,
         processedBlob.type || 'video/webm',
-        rawBlob.type || rawBlob.size ? rawBlob.type || 'video/webm' : 'video/webm',
+        rawBlob.size ? rawBlob.type || 'video/webm' : 'video/webm',
       );
       dispatch({ type: 'SAVE_PROGRESS', step: 'Uploading processed video...' });
       await api.uploadVideo(manifest.id, manifest.processed, processedBlob);
@@ -222,23 +200,20 @@ export default function CapturePage() {
       await api.completeResult(manifest.id);
       dispatch({ type: 'SAVE_COMPLETE', id: manifest.id });
     } catch (e) {
-      dispatch({
-        type: 'SAVE_FAILED',
-        message: e instanceof Error ? e.message : String(e),
-      });
+      dispatch({ type: 'SAVE_FAILED', message: e instanceof Error ? e.message : String(e) });
     }
   };
 
   const handleColourPreset = (colour: string) => {
-    const svc = serviceRef.current;
-    if (!svc) return;
     const preset = PRESETS[colour];
-    if (preset) {
-      svc.setConfig({ colour, hue: preset.hue });
-    }
+    if (!preset) return;
+    const updates = { colour, hue: preset.hue };
+    setConfig((prev) => ({ ...prev, ...updates }));
+    serviceRef.current?.setConfig(updates);
   };
 
   const handleConfigChange = (updates: Partial<TrackingConfig>) => {
+    setConfig((prev) => ({ ...prev, ...updates }));
     serviceRef.current?.setConfig(updates);
   };
 
@@ -261,38 +236,18 @@ export default function CapturePage() {
   return (
     <main className="layout capture-layout">
       <section className="video-pane">
-        <video ref={videoRef} id="source" playsInline hidden={state.phase !== 'reviewing'} />
-        <canvas
-          ref={canvasRef}
-          id="output"
-          hidden={state.phase === 'reviewing'}
-          onClick={handleSampleColour}
-        />
+        <video ref={videoRef} id="source" playsInline hidden={state.phase !== 'reviewing'} controls={state.phase === 'reviewing'} />
+        <canvas ref={canvasRef} id="output" hidden={state.phase === 'reviewing'} onClick={handleSampleColour} />
 
         {!hasSource && (
-          <div id="empty" style={{ position: 'absolute', textAlign: 'center', padding: 25 }}>
-            <h1
-              style={{
-                fontSize: 'clamp(24px, 3vw, 42px)',
-                fontWeight: 500,
-                letterSpacing: '-0.04em',
-                margin: '0 0 15px',
-              }}
-            >
-              Chiron
-            </h1>
-            <p style={{ fontSize: 16, color: '#9cacbe', marginBottom: 24 }}>
-              Dodgeball throw analysis with body pose, hand tracking, and ball detection.
-            </p>
+          <div id="empty">
+            <h1>Chiron</h1>
+            <p>Dodgeball throw analysis with body pose, hand tracking, and ball detection.</p>
             <div>
               <button onClick={handleEnableCamera} disabled={!isReady || state.opening}>
                 Enable camera
               </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={state.opening || active}
-                style={{ marginLeft: 8 }}
-              >
+              <button onClick={() => fileInputRef.current?.click()} disabled={state.opening || active} style={{ marginLeft: 8 }}>
                 Upload video
               </button>
             </div>
@@ -300,203 +255,103 @@ export default function CapturePage() {
         )}
 
         <div className="video-header">
-          <span>
-            {state.source === 'camera'
-              ? 'LIVE CAMERA'
-              : state.source === 'upload'
-                ? 'UPLOADED VIDEO'
-                : ''}
-          </span>
+          <span>{state.source === 'camera' ? 'LIVE CAMERA' : state.source === 'upload' ? 'UPLOADED VIDEO' : ''}</span>
           <a href="#/results">Results →</a>
         </div>
 
         <div className="video-controls">
           <div>
             {state.phase === 'scanning' && state.scanProgress && (
-              <span>
-                Finding throws · {state.scanProgress.current.toFixed(1)}s /{' '}
-                {state.scanProgress.total.toFixed(1)}s
-              </span>
+              <span>Finding throws · {state.scanProgress.current.toFixed(1)}s / {state.scanProgress.total.toFixed(1)}s</span>
             )}
             {state.phase === 'processing' && state.processProgress && (
-              <span>
-                Processing · {state.processProgress.done} / {state.processProgress.total} frames
-              </span>
+              <span>Processing · {state.processProgress.done} / {state.processProgress.total} frames</span>
             )}
             {state.phase === 'saving' && <span>{state.saveStep}</span>}
             {state.phase === 'saved' && (
-              <span>
-                Saved! <a href={`#/results/${state.savedId}`}>View result →</a>
-              </span>
+              <span>Saved! <a href={`#/results/${state.savedId}`}>View result →</a></span>
             )}
           </div>
           <div className="buttons">
             {hasSource && (
               <>
-                <button
-                  onClick={handleStartRecording}
-                  disabled={!isReady || active || state.opening}
-                >
+                <button onClick={handleStartRecording} disabled={!isReady || active || state.opening}>
                   {state.source === 'upload'
-                    ? state.phase === 'reviewing'
-                      ? 'Find throws again'
-                      : 'Find throws'
+                    ? state.phase === 'reviewing' ? 'Find throws again' : 'Find throws'
                     : '● Start recording'}
                 </button>
-                <button
-                  onClick={handleStopRecording}
-                  disabled={state.phase !== 'recording' && !uploadJobRef.current}
-                >
+                <button onClick={handleStopRecording} disabled={state.phase !== 'recording' && !uploadJobRef.current}>
                   {uploadJobRef.current ? 'Cancel' : '■ Stop'}
                 </button>
                 {state.source === 'upload' && (
-                  <button onClick={handleEnableCamera} disabled={active || state.opening}>
-                    Use camera
-                  </button>
+                  <button onClick={handleEnableCamera} disabled={active || state.opening}>Use camera</button>
                 )}
               </>
             )}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={active || state.opening}
-              style={{ display: hasSource ? undefined : 'none' }}
-            >
+            <button onClick={() => fileInputRef.current?.click()} disabled={active || state.opening} style={{ display: hasSource ? undefined : 'none' }}>
               Upload
             </button>
           </div>
           {state.errorMessage && (
-            <p id="error" style={{ color: '#ffa9aa', fontSize: 13, margin: 0, flexBasis: '100%' }}>
-              {state.errorMessage}
-            </p>
+            <p id="error">{state.errorMessage}</p>
           )}
           {!state.errorMessage && state.phase === 'loading' && (
-            <p id="status" style={{ color: '#a5b3c2', fontSize: 13, margin: 0, flexBasis: '100%' }}>
-              Loading pipelines... Ball: {state.pipelines.ball ? '✓' : '...'} Pose:{' '}
-              {state.pipelines.pose ? '✓' : '...'} Hands: {state.pipelines.hands ? '✓' : '...'}
+            <p id="status">
+              Loading pipelines... Ball: {state.pipelines.ball ? '✓' : '...'} Pose: {state.pipelines.pose ? '✓' : '...'} Hands: {state.pipelines.hands ? '✓' : '...'}
             </p>
           )}
         </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="video/mp4,video/webm,.mp4,.webm"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleUpload(file);
-            e.target.value = '';
-          }}
+        <input ref={fileInputRef} type="file" accept="video/mp4,video/webm,.mp4,.webm" style={{ display: 'none' }}
+          onChange={(e) => { const file = e.target.files?.[0]; if (file) handleUpload(file); e.target.value = ''; }}
         />
       </section>
 
       <aside className="sidebar">
-        {/* Tracking config */}
         <section className="half">
           <h2>Tracking</h2>
-
           <fieldset id="colours">
             <legend>Ball colour</legend>
             {Object.entries(PRESETS).map(([colour, preset]) => (
               <label key={colour} style={{ '--swatch': preset.swatch } as React.CSSProperties}>
-                <input
-                  type="radio"
-                  name="colour"
-                  checked={config?.colour === colour}
-                  onChange={() => handleColourPreset(colour)}
-                  disabled={active}
-                />
+                <input type="radio" name="colour" checked={config.colour === colour} onChange={() => handleColourPreset(colour)} />
                 <span />
                 {colour.charAt(0).toUpperCase() + colour.slice(1)}
               </label>
             ))}
           </fieldset>
 
-          <div className="range-label">
-            <span>Tolerance</span>
-            <span>{config?.tolerance}</span>
-          </div>
-          <input
-            type="range"
-            min="5"
-            max="40"
-            value={config?.tolerance ?? 14}
-            onChange={(e) => handleConfigChange({ tolerance: parseInt(e.target.value) })}
-            disabled={active}
-          />
+          <div className="range-label"><span>Tolerance</span><span>{config.tolerance}</span></div>
+          <input type="range" min="5" max="40" value={config.tolerance} onChange={(e) => handleConfigChange({ tolerance: parseInt(e.target.value) })} />
 
-          <div className="range-label">
-            <span>Saturation</span>
-            <span>{config?.saturation}</span>
-          </div>
-          <input
-            type="range"
-            min="30"
-            max="255"
-            value={config?.saturation ?? 140}
-            onChange={(e) => handleConfigChange({ saturation: parseInt(e.target.value) })}
-            disabled={active}
-          />
+          <div className="range-label"><span>Saturation</span><span>{config.saturation}</span></div>
+          <input type="range" min="30" max="255" value={config.saturation} onChange={(e) => handleConfigChange({ saturation: parseInt(e.target.value) })} />
 
           <label className="isolate-option">
-            <input
-              type="checkbox"
-              checked={config?.isolate ?? true}
-              onChange={(e) => handleConfigChange({ isolate: e.target.checked })}
-              disabled={active}
-            />
+            <input type="checkbox" checked={config.isolate} onChange={(e) => handleConfigChange({ isolate: e.target.checked })} />
             Show isolation overlay
           </label>
 
           <details>
             <summary>Sample from video</summary>
-            <button
-              onClick={() => {
-                if (canvasRef.current)
-                  canvasRef.current.parentElement?.classList.toggle('sampling');
-              }}
-              disabled={!hasSource || !isReady || active}
-            >
+            <button onClick={() => { if (canvasRef.current) canvasRef.current.parentElement?.classList.toggle('sampling'); }} disabled={!hasSource || !isReady || active}>
               Click canvas to sample ball colour
             </button>
           </details>
         </section>
 
-        {/* Live stats & throw review */}
         <section className="half">
           <h2>Detection</h2>
           <div className="stats">
-            <div>
-              <span>Ball</span>
-              <strong>{frameStats.ballState}</strong>
-            </div>
-            <div>
-              <span>Body</span>
-              <strong>{frameStats.bodyState}</strong>
-            </div>
-            <div>
-              <span>Hands</span>
-              <strong>{frameStats.handState}</strong>
-            </div>
-            <div>
-              <span>Score</span>
-              <strong>{frameStats.trackingScore?.toFixed(2) ?? '—'}</strong>
-            </div>
-            <div>
-              <span>FPS</span>
-              <strong>{frameStats.fps || '—'}</strong>
-            </div>
+            <div><span>Ball</span><strong>{frameStats.ballState}</strong></div>
+            <div><span>Body</span><strong>{frameStats.bodyState}</strong></div>
+            <div><span>Hands</span><strong>{frameStats.handState}</strong></div>
+            <div><span>Score</span><strong>{frameStats.trackingScore?.toFixed(2) ?? '—'}</strong></div>
+            <div><span>FPS</span><strong>{frameStats.fps || '—'}</strong></div>
           </div>
 
-          {/* Throw review section */}
           {state.phase === 'reviewing' && (
-            <ThrowReview
-              windows={state.throwWindows}
-              onUpdate={handleWindowUpdate}
-              onProcess={handleProcessThrows}
-              videoRef={videoRef}
-              disabled={active}
-            />
+            <ThrowReview windows={state.throwWindows} onUpdate={handleWindowUpdate} onProcess={handleProcessThrows} videoRef={videoRef} disabled={active} />
           )}
         </section>
       </aside>
@@ -504,13 +359,7 @@ export default function CapturePage() {
   );
 }
 
-function ThrowReview({
-  windows,
-  onUpdate,
-  onProcess,
-  videoRef,
-  disabled,
-}: {
+function ThrowReview({ windows, onUpdate, onProcess, videoRef, disabled }: {
   windows: ThrowWindow[];
   onUpdate: (windows: ThrowWindow[]) => void;
   onProcess: () => void;
@@ -521,26 +370,13 @@ function ThrowReview({
     const v = videoRef.current;
     if (!v) return;
     const start = Math.max(0, Math.min(v.currentTime, v.duration - 1 / 30));
-    onUpdate([
-      ...windows,
-      {
-        start_s: +start.toFixed(6),
-        end_s: Math.min(v.duration, start + 2),
-        edited: true,
-        estimates: [],
-      },
-    ]);
+    onUpdate([...windows, { start_s: +start.toFixed(6), end_s: Math.min(v.duration, start + 2), edited: true, estimates: [] }]);
   };
 
-  const handleRemove = (index: number) => {
-    onUpdate(windows.filter((_, i) => i !== index));
-  };
+  const handleRemove = (index: number) => { onUpdate(windows.filter((_, i) => i !== index)); };
 
   const handleChange = (index: number, field: 'start_s' | 'end_s', value: number) => {
-    const updated = windows.map((w, i) =>
-      i === index ? { ...w, [field]: value, edited: true } : w,
-    );
-    onUpdate(updated);
+    onUpdate(windows.map((w, i) => i === index ? { ...w, [field]: value, edited: true } : w));
   };
 
   const handlePreview = async (w: ThrowWindow) => {
@@ -548,70 +384,27 @@ function ThrowReview({
     if (!v) return;
     v.currentTime = w.start_s;
     await v.play();
-    const onTime = () => {
-      if (v.currentTime >= w.end_s) {
-        v.pause();
-        v.removeEventListener('timeupdate', onTime);
-      }
-    };
+    const onTime = () => { if (v.currentTime >= w.end_s) { v.pause(); v.removeEventListener('timeupdate', onTime); } };
     v.addEventListener('timeupdate', onTime);
   };
 
   return (
     <div id="throw-review">
       <h2>Throw Windows</h2>
-      <p className="hint">
-        {windows.length
-          ? 'Estimated boundaries. Review the full motion and adjust as needed.'
-          : 'No throws found. Play the video, then add a window for each throw.'}
-      </p>
+      <p className="hint">{windows.length ? 'Estimated boundaries. Review the full motion and adjust as needed.' : 'No throws found. Play the video, then add a window for each throw.'}</p>
       <div id="throw-windows">
         {windows.map((w, i) => (
           <fieldset key={i} className="throw-window">
-            <legend>
-              Throw {i + 1}
-              {w.edited ? ' · edited' : w.estimates?.length ? ' · estimated' : ' · manual'}
-            </legend>
-            <label>
-              Start (s)
-              <input
-                type="number"
-                step="0.001"
-                min="0"
-                value={w.start_s}
-                onChange={(e) => handleChange(i, 'start_s', parseFloat(e.target.value))}
-                disabled={disabled}
-              />
-            </label>
-            <label>
-              End (s)
-              <input
-                type="number"
-                step="0.001"
-                min="0"
-                value={w.end_s}
-                onChange={(e) => handleChange(i, 'end_s', parseFloat(e.target.value))}
-                disabled={disabled}
-              />
-            </label>
-            <button type="button" onClick={() => handlePreview(w)} disabled={disabled}>
-              Preview throw
-            </button>
-            <button type="button" onClick={() => handleRemove(i)} disabled={disabled}>
-              Remove
-            </button>
+            <legend>Throw {i + 1}{w.edited ? ' · edited' : w.estimates?.length ? ' · estimated' : ' · manual'}</legend>
+            <label>Start (s)<input type="number" step="0.001" min="0" value={w.start_s} onChange={(e) => handleChange(i, 'start_s', parseFloat(e.target.value))} disabled={disabled} /></label>
+            <label>End (s)<input type="number" step="0.001" min="0" value={w.end_s} onChange={(e) => handleChange(i, 'end_s', parseFloat(e.target.value))} disabled={disabled} /></label>
+            <button type="button" onClick={() => handlePreview(w)} disabled={disabled}>Preview throw</button>
+            <button type="button" onClick={() => handleRemove(i)} disabled={disabled}>Remove</button>
           </fieldset>
         ))}
       </div>
-      <button type="button" onClick={handleAdd} disabled={disabled}>
-        + Add throw window
-      </button>
-      <button
-        id="process-throws"
-        className="primary"
-        onClick={onProcess}
-        disabled={disabled || windows.length === 0}
-      >
+      <button type="button" onClick={handleAdd} disabled={disabled}>+ Add throw window</button>
+      <button id="process-throws" className="primary" onClick={onProcess} disabled={disabled || windows.length === 0}>
         Process {windows.length} throw{windows.length !== 1 ? 's' : ''}
       </button>
     </div>

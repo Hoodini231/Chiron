@@ -17,6 +17,17 @@ export default function VideoPlayer({ src, videoRef: externalRef }: Props) {
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(1);
 
+  useEffect(() => {
+    const v = videoEl.current;
+    if (!v) return;
+    if (src) {
+      v.load();
+    } else {
+      v.removeAttribute('src');
+      v.load();
+    }
+  }, [src, videoEl]);
+
   const sync = useCallback(() => {
     const v = videoEl.current;
     if (!v) return;

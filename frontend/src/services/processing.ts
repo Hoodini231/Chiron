@@ -174,11 +174,11 @@ export class ProcessingService {
 
   private async loadModules() {
     const [features, handFeat, throwWin, uploadProc, videoWriter] = await Promise.all([
-      import('@pipelines/features.js' /* @vite-ignore */),
-      import('@pipelines/hand-features.js' /* @vite-ignore */),
-      import('@pipelines/throw-windows.js' /* @vite-ignore */),
-      import('@pipelines/upload-processing.js' /* @vite-ignore */),
-      import('@pipelines/video-writer.js' /* @vite-ignore */),
+      import('./pipelines/features.js' /* @vite-ignore */),
+      import('./pipelines/hand-features.js' /* @vite-ignore */),
+      import('./pipelines/throw-windows.js' /* @vite-ignore */),
+      import('./pipelines/upload-processing.js' /* @vite-ignore */),
+      import('./pipelines/video-writer.js' /* @vite-ignore */),
     ]);
     this.modules.poseFeatures = features.poseFeatures;
     this.modules.summarize = features.summarize;
@@ -222,7 +222,7 @@ export class ProcessingService {
         document.head.append(script);
       });
 
-      const trackerMod = await import('@pipelines/tracker.js' /* @vite-ignore */);
+      const trackerMod = await import('./pipelines/tracker.js' /* @vite-ignore */);
       this.modules.BallTracker = trackerMod.BallTracker;
       this.modules.PRESETS = trackerMod.PRESETS;
       this.tracker = new trackerMod.BallTracker(cv);
@@ -240,7 +240,7 @@ export class ProcessingService {
 
   private async loadPose() {
     try {
-      const poseMod = await import('@pipelines/pose.js' /* @vite-ignore */);
+      const poseMod = await import('./pipelines/pose.js' /* @vite-ignore */);
       this.modules.createPoseTracker = poseMod.createPoseTracker;
       this.modules.drawPose = poseMod.drawPose;
       this.poseTracker = await poseMod.createPoseTracker();
@@ -258,7 +258,7 @@ export class ProcessingService {
 
   private async loadHands() {
     try {
-      const handsMod = await import('@pipelines/hands.js' /* @vite-ignore */);
+      const handsMod = await import('./pipelines/hands.js' /* @vite-ignore */);
       this.modules.createHandTracker = handsMod.createHandTracker;
       this.modules.collectHands = handsMod.collectHands;
       this.modules.drawHands = handsMod.drawHands;
