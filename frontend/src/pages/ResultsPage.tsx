@@ -59,7 +59,6 @@ export default function ResultsPage() {
 
   const loadResult = useCallback(async (resultId: string) => {
     const token = ++loadTokenRef.current;
-    setCurrent(null);
     setChatStatus('');
     try {
       const record = await api.getResult(resultId);
@@ -110,34 +109,12 @@ export default function ResultsPage() {
 
   const available = config?.llm_configured ?? false;
 
-  if (loading) {
-    return (
-      <main className="layout">
-        <section className="video-pane results-pane">
-          <div className="empty-library">
-            <h1>Saved results</h1>
-            <p>Loading recordings...</p>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
-  if (error && !recordings.length) {
-    return (
-      <main className="layout">
-        <section className="video-pane results-pane">
-          <div className="empty-library">
-            <h1>Saved results</h1>
-            <p>Could not load local results: {error}</p>
-            <a href="/">Record a throw</a>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
   const m = current?.metrics;
+  const emptyMessage = loading
+    ? 'Loading recordings...'
+    : error
+      ? `Could not load local results: ${error}`
+      : 'Recordings will appear here after you press Stop.';
 
   return (
     <main
@@ -154,11 +131,11 @@ export default function ResultsPage() {
             <a href={`#/analysis/${current.id}`}>Analysis view ↗</a>
           </div>
         )}
-        {!current && recordings.length === 0 && (
+        {!current && (
           <div className="empty-library">
             <h1>Saved results</h1>
-            <p>Recordings will appear here after you press Stop.</p>
-            <a href="/">Record a throw</a>
+            <p>{emptyMessage}</p>
+            {!loading && <a href="/">Record a throw</a>}
           </div>
         )}
       </section>
