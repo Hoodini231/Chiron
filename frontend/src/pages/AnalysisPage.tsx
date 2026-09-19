@@ -330,7 +330,13 @@ export default function AnalysisPage() {
 
 // --- Sub-components ---
 
-function CroppedVideo({ record, videoRef }: { record: ResultDetailResponse | null; videoRef: React.RefObject<HTMLVideoElement | null> }) {
+function CroppedVideo({
+  record,
+  videoRef,
+}: {
+  record: ResultDetailResponse | null;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+}) {
   useEffect(() => {
     if (!record || !videoRef.current) return;
     const v = videoRef.current;
@@ -391,7 +397,13 @@ function CroppedVideo({ record, videoRef }: { record: ResultDetailResponse | nul
   );
 }
 
-function PlaybackControls({ videoRef, recordId }: { videoRef: React.RefObject<HTMLVideoElement | null>; recordId?: string }) {
+function PlaybackControls({
+  videoRef,
+  recordId,
+}: {
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  recordId?: string;
+}) {
   const FRAME_DUR = 1 / 30;
   const [paused, setPaused] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
@@ -451,15 +463,47 @@ function PlaybackControls({ videoRef, recordId }: { videoRef: React.RefObject<HT
 
   return (
     <div className="video-controls-bar">
-      <button onClick={() => { const v = videoRef.current; if (v) { v.pause(); v.currentTime = Math.max(0, v.currentTime - FRAME_DUR); } }}>‹</button>
-      <button onClick={() => { const v = videoRef.current; if (v) v.paused ? v.play() : v.pause(); }}>{paused ? '▶' : '⏸'}</button>
-      <button onClick={() => { const v = videoRef.current; if (v) { v.pause(); v.currentTime = Math.min(v.duration, v.currentTime + FRAME_DUR); } }}>›</button>
+      <button
+        onClick={() => {
+          const v = videoRef.current;
+          if (v) {
+            v.pause();
+            v.currentTime = Math.max(0, v.currentTime - FRAME_DUR);
+          }
+        }}
+      >
+        ‹
+      </button>
+      <button
+        onClick={() => {
+          const v = videoRef.current;
+          if (v) v.paused ? v.play() : v.pause();
+        }}
+      >
+        {paused ? '▶' : '⏸'}
+      </button>
+      <button
+        onClick={() => {
+          const v = videoRef.current;
+          if (v) {
+            v.pause();
+            v.currentTime = Math.min(v.duration, v.currentTime + FRAME_DUR);
+          }
+        }}
+      >
+        ›
+      </button>
       <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '12px', color: '#9caaba' }}>
         {formatTime(currentTime)} / {formatTime(duration)}
       </span>
       <select
         value={speed}
-        onChange={(e) => { const v = videoRef.current; const s = parseFloat(e.target.value); if (v) v.playbackRate = s; setSpeed(s); }}
+        onChange={(e) => {
+          const v = videoRef.current;
+          const s = parseFloat(e.target.value);
+          if (v) v.playbackRate = s;
+          setSpeed(s);
+        }}
         style={{ width: 'auto', marginBottom: 0 }}
       >
         {[0.25, 0.5, 1, 1.5, 2].map((s) => (
