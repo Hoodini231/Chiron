@@ -168,11 +168,7 @@ export default function AnalysisPage() {
             </option>
           ))}
         </select>
-        {current && (
-          <a href={`/results/${current.id}/${current.original}`}>
-            Original video ↗
-          </a>
-        )}
+        {current && <a href={`/results/${current.id}/${current.original}`}>Original video ↗</a>}
       </div>
 
       <div className="page">
