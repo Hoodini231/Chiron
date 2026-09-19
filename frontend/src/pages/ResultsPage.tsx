@@ -130,7 +130,7 @@ export default function ResultsPage() {
           <div className="empty-library">
             <h1>Saved results</h1>
             <p>Could not load local results: {error}</p>
-            <a href="#/capture">Record a throw</a>
+            <a href="/">Record a throw</a>
           </div>
         </section>
       </main>
@@ -146,22 +146,21 @@ export default function ResultsPage() {
       style={{ gridTemplateColumns: `${colSplit}% 6px 1fr` }}
     >
       <section className="video-pane results-pane">
-        {current ? (
-          <>
-            <VideoPlayer src={`/results/${current.id}/${current.processed}`} />
-            <div className="result-nav">
-              <a href="#/capture">← Record a throw</a>
-              <a href={`/results/${current.id}/${current.original}`}>Original video ↗</a>
-              <a href={`#/analysis/${current.id}`}>Analysis view ↗</a>
-            </div>
-          </>
-        ) : recordings.length === 0 ? (
+        <VideoPlayer src={current ? `/results/${current.id}/${current.processed}` : null} />
+        {current && (
+          <div className="result-nav">
+            <a href="/">← Record a throw</a>
+            <a href={`/results/${current.id}/${current.original}`}>Original video ↗</a>
+            <a href={`#/analysis/${current.id}`}>Analysis view ↗</a>
+          </div>
+        )}
+        {!current && recordings.length === 0 && (
           <div className="empty-library">
             <h1>Saved results</h1>
             <p>Recordings will appear here after you press Stop.</p>
-            <a href="#/capture">Record a throw</a>
+            <a href="/">Record a throw</a>
           </div>
-        ) : null}
+        )}
       </section>
 
       <ResizablePanel
