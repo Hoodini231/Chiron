@@ -268,7 +268,11 @@ export default function CapturePage() {
               <button onClick={handleEnableCamera} disabled={state.opening}>
                 Enable camera
               </button>
-              <button onClick={() => fileInputRef.current?.click()} disabled={state.opening} style={{ marginLeft: 8 }}>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={state.opening}
+                style={{ marginLeft: 8 }}
+              >
                 Upload video
               </button>
             </div>
