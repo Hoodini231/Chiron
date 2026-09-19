@@ -177,7 +177,7 @@ export default function AnalysisPage() {
   return (
     <>
       <div className="top-bar">
-        <a href="#/results">← Results</a>
+        <a href="#/capture">← Record a throw</a>
         <select value={id ?? ''} onChange={(e) => navigate(`/analysis/${e.target.value}`)}>
           {recordings.map((r) => (
             <option key={r.id} value={r.id}>
@@ -185,6 +185,11 @@ export default function AnalysisPage() {
             </option>
           ))}
         </select>
+        {current && (
+          <a href={`/results/${current.id}/${current.original}`}>
+            Original video ↗
+          </a>
+        )}
       </div>
 
       <div className="page">
@@ -203,9 +208,9 @@ export default function AnalysisPage() {
 
           <div className="score-column">
             <div className="score-header">
-              <h2>Assessment</h2>
+              Coaching Review
               {advice && current?.advice && (
-                <span id="score-header-provider">
+                <span>
                   powered by {current.advice.provider} {current.advice.model}
                 </span>
               )}
@@ -227,9 +232,10 @@ export default function AnalysisPage() {
                 </button>
               </div>
             ) : (
-              <div id="score-content">
+              <>
+                <div className="section-title">Throw phases</div>
                 <ScorePills phases={advice.phases} />
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -237,7 +243,8 @@ export default function AnalysisPage() {
         {/* Priorities */}
         {advice && advice.priorities.length > 0 && (
           <>
-            <div className="section-title">TOP PRIORITIES</div>
+            <hr className="divider" />
+            <div className="section-title">Top 3 priorities</div>
             <Priorities priorities={advice.priorities} />
           </>
         )}
@@ -245,7 +252,8 @@ export default function AnalysisPage() {
         {/* Coaching Breakdown */}
         {advice && (
           <>
-            <div className="section-title">COACHING BREAKDOWN</div>
+            <hr className="divider" />
+            <div className="section-title">Coaching breakdown</div>
             <CoachingBreakdown advice={advice} duration={m?.duration_s} />
           </>
         )}
@@ -280,14 +288,14 @@ export default function AnalysisPage() {
         aria-label="Toggle coach chat"
       >
         <span className="fab-icon">{chatOpen ? '✕' : '💬'}</span>
-        {!chatOpen && <span className="fab-label">Ask coach</span>}
+        {!chatOpen && <span className="fab-label">Coach chat</span>}
       </button>
 
       {chatOpen && (
         <div className="chat-popup">
           <div className="chat-popup-header">
             <h3>
-              Coach chat <span className="tag">LLM</span>
+              Ask the coach <span className="tag">LLM</span>
             </h3>
             <button onClick={() => setChatOpen(false)}>✕</button>
           </div>
@@ -514,7 +522,7 @@ function ScorePills({ phases }: { phases: AdvicePhase[] }) {
     <div id="score-pills">
       {phases.map((phase, i) => {
         const summary = (phase.subs[0]?.text || phase.coachingNote || '').split(/[.!]\s/)[0] + '.';
-        const cue = phase.coachingNote ? phase.coachingNote.split(/[.!]\s/)[0] + '.' : '';
+        const cueText = phase.coachingNote ? phase.coachingNote.split(/[.!]\s/)[0] + '.' : '';
         return (
           <div key={i} className={`category ${phase.status}`}>
             <div className="indicator" />
@@ -522,8 +530,8 @@ function ScorePills({ phases }: { phases: AdvicePhase[] }) {
               <div className="cat-title">
                 {phase.title} <span className="badge">{badgeFor(phase.status)}</span>
               </div>
-              <div className="cat-summary">{summary}</div>
-              {cue && <div className="cat-cue">{cue}</div>}
+              <div className="cat-detail">{summary}</div>
+              {cueText && <div className="cat-cue">{cueText}</div>}
             </div>
           </div>
         );

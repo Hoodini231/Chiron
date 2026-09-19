@@ -4,13 +4,11 @@ import { ProcessingService } from '../../services/processing';
 import type { ThrowWindow, TrackingConfig } from '../../types/capture';
 import { captureReducer, initialState } from './captureReducer';
 
-const PRESETS: Record<string, { hue: number; tolerance: number; saturation: number }> = {
-  red: { hue: 0, tolerance: 14, saturation: 140 },
-  orange: { hue: 15, tolerance: 12, saturation: 150 },
-  yellow: { hue: 29, tolerance: 14, saturation: 140 },
-  green: { hue: 65, tolerance: 18, saturation: 110 },
-  blue: { hue: 105, tolerance: 15, saturation: 120 },
-  purple: { hue: 138, tolerance: 14, saturation: 100 },
+const PRESETS: Record<string, { hue: number; swatch: string }> = {
+  red: { hue: 0, swatch: '#ff5a62' },
+  teal: { hue: 88, swatch: '#31c8c2' },
+  yellow: { hue: 29, swatch: '#f6d65c' },
+  purple: { hue: 143, swatch: '#b181f0' },
 };
 
 export default function CapturePage() {
@@ -236,7 +234,7 @@ export default function CapturePage() {
     if (!svc) return;
     const preset = PRESETS[colour];
     if (preset) {
-      svc.setConfig({ colour, ...preset });
+      svc.setConfig({ colour, hue: preset.hue });
     }
   };
 
@@ -397,10 +395,10 @@ export default function CapturePage() {
         <section className="half">
           <h2>Tracking</h2>
 
-          <fieldset>
+          <fieldset id="colours">
             <legend>Ball colour</legend>
-            {Object.keys(PRESETS).map((colour) => (
-              <label key={colour} style={{ '--swatch': colour } as React.CSSProperties}>
+            {Object.entries(PRESETS).map(([colour, preset]) => (
+              <label key={colour} style={{ '--swatch': preset.swatch } as React.CSSProperties}>
                 <input
                   type="radio"
                   name="colour"
