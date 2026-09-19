@@ -104,7 +104,6 @@ export default function AnalysisPage() {
 
   const loadResult = useCallback(async (resultId: string) => {
     const token = ++loadTokenRef.current;
-    setCurrent(null);
     try {
       const record = await api.getResult(resultId);
       if (token !== loadTokenRef.current) return;
@@ -155,23 +154,6 @@ export default function AnalysisPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="page" style={{ padding: '40px', textAlign: 'center' }}>
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
-  if (error && !current) {
-    return (
-      <div className="page" style={{ padding: '40px', textAlign: 'center' }}>
-        <p>{error}</p>
-        <a href="#/results">← Back to results</a>
-      </div>
-    );
-  }
-
   const m = current?.metrics;
   const advice = current?.advice ? parseAdvice(current.advice.text) : null;
 
@@ -218,20 +200,13 @@ export default function AnalysisPage() {
             </div>
 
             {!advice ? (
-              <div id="no-advice-section">
-                <p>
-                  {available
-                    ? 'Generate coaching advice to see the assessment.'
-                    : 'LLM not connected. Add API key to .env and restart.'}
-                </p>
-                <button
-                  className="generate-btn"
-                  onClick={handleGenerateAdvice}
-                  disabled={!available || adviceBusy}
-                >
-                  {adviceBusy ? 'Generating...' : 'Get coaching advice'}
-                </button>
-              </div>
+              <p style={{ color: 'var(--muted)', fontSize: 13, lineHeight: 1.6 }}>
+                {loading
+                  ? 'Loading...'
+                  : error && !current
+                    ? error
+                    : 'Select a recording and generate coaching advice to see the analysis.'}
+              </p>
             ) : (
               <>
                 <div className="section-title">Throw phases</div>
@@ -240,6 +215,23 @@ export default function AnalysisPage() {
             )}
           </div>
         </div>
+
+        {/* Generate advice CTA — shown below hero when no advice exists */}
+        {!advice && current && (
+          <>
+            <hr className="divider" />
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}>
+              <button
+                className="generate-btn primary"
+                onClick={handleGenerateAdvice}
+                disabled={!available || adviceBusy || !current}
+                style={{ padding: '14px 32px', fontSize: 15, borderRadius: 8 }}
+              >
+                {adviceBusy ? 'Generating...' : 'Get coaching advice'}
+              </button>
+            </div>
+          </>
+        )}
 
         {/* Priorities */}
         {advice && advice.priorities.length > 0 && (
@@ -268,7 +260,7 @@ export default function AnalysisPage() {
         )}
 
         {/* Pipeline Data Drawer */}
-        <div className="divider" />
+        <hr className="divider" />
         <button className="data-toggle" onClick={() => setDrawerOpen(!drawerOpen)}>
           {drawerOpen ? '▾' : '▸'} Pipeline data
         </button>
