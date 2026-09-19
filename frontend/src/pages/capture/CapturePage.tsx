@@ -265,14 +265,10 @@ export default function CapturePage() {
             <h1>Chiron</h1>
             <p>Dodgeball throw analysis with body pose, hand tracking, and ball detection.</p>
             <div>
-              <button onClick={handleEnableCamera} disabled={!isReady || state.opening}>
+              <button onClick={handleEnableCamera} disabled={state.opening}>
                 Enable camera
               </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={state.opening || active}
-                style={{ marginLeft: 8 }}
-              >
+              <button onClick={() => fileInputRef.current?.click()} disabled={state.opening} style={{ marginLeft: 8 }}>
                 Upload video
               </button>
             </div>
