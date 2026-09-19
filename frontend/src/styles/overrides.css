@@ -1,0 +1,82 @@
+/* Adapt id-based selectors from dist/style.css to class-based selectors for React components */
+
+.chat-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.chat-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 64px;
+  background: #10151b;
+  color: #eef3f7;
+  border: 1px solid #39434e;
+  border-radius: 8px;
+  padding: 10px;
+  font: inherit;
+}
+
+.chat-form button[type='submit'] {
+  justify-self: end;
+}
+
+.chat-status:empty {
+  display: none;
+}
+
+.chat-panel .chat-form {
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.chat-panel .chat-form textarea {
+  min-height: 48px;
+  padding: 8px;
+}
+
+.chat-panel .chat-form button[type='submit'] {
+  padding: 6px 12px;
+}
+
+.chat-panel .chat-status {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #93a1b2;
+}
+
+/* VideoPlayer — fills the .video-pane grid cell and keeps video inside viewport */
+.video-player {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.video-player video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.video-player .playback-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+}
+
+/* Generate advice button */
+.advice-panel .generate-advice {
+  width: 100%;
+  margin: 4px 0 14px;
+}
+
+.playback-controls select {
+  width: auto;
+  margin-bottom: 0;
+}
